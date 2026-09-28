@@ -186,6 +186,7 @@ export default function FleetApp() {
               data={data}
               onSave={saveReport}
               onDelete={deleteReport}
+              onSaveDriver={saveDriver}
               openTrigger={quickReportTrigger}
             />
           </>

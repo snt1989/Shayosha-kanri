@@ -22,7 +22,9 @@ export type Report = {
   preAlcohol: string;
   preChecker: string;
   preMethod?: string;
-  preCheckOk: boolean;
+  alcoholSkipped?: boolean;
+  tireOk: boolean;
+  brakeOk: boolean;
   postDone: boolean;
   postTime: string;
   postAlcohol: string;

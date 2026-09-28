@@ -1,8 +1,8 @@
 'use client';
 
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { AppData, Report } from '@/lib/types';
-import { nowTimeStr, todayStr } from '@/lib/utils';
+import { AppData, Driver, Report } from '@/lib/types';
+import { genId, nowTimeStr, todayStr } from '@/lib/utils';
 import { downloadCsv } from '@/lib/csv';
 import Modal from './Modal';
 
@@ -10,6 +10,7 @@ const emptyReport = (data: AppData): Report => ({
   id: '',
   date: todayStr(),
   dept: data.masters.departments[0] || '',
+  driverId: '',
   driverLast: '',
   driverFirst: '',
   driver: '',
@@ -22,7 +23,9 @@ const emptyReport = (data: AppData): Report => ({
   preAlcohol: '0.00',
   preChecker: data.masters.checkers[0] || '',
   preMethod: data.masters.checkMethods[0] || '',
-  preCheckOk: true,
+  alcoholSkipped: false,
+  tireOk: true,
+  brakeOk: true,
   postDone: false,
   postTime: '',
   postAlcohol: '0.00',
@@ -33,6 +36,19 @@ const emptyReport = (data: AppData): Report => ({
   tripKm: 0,
   notes: '',
   inspectionPhoto: '',
+});
+
+const emptyQuickDriver = (data: AppData): Driver => ({
+  id: '',
+  lastName: '',
+  firstName: '',
+  empId: '',
+  dept: data.masters.departments[0] || '',
+  licenseType: data.masters.licenseTypes[0] || '',
+  licenseExpiry: '',
+  phone: '',
+  licenseNo: '',
+  notes: '本人登録（出発登録画面より）',
 });
 
 function reportsToCsv(reports: Report[]): string {
@@ -65,16 +81,20 @@ export default function ReportsTab({
   data,
   onSave,
   onDelete,
+  onSaveDriver,
   openTrigger,
 }: {
   data: AppData;
   onSave: (r: Report) => Promise<unknown>;
   onDelete: (id: string) => Promise<unknown>;
+  onSaveDriver: (d: Driver) => Promise<unknown>;
   openTrigger?: number;
 }) {
   const [query, setQuery] = useState('');
   const [editing, setEditing] = useState<Report | null>(null);
   const [saving, setSaving] = useState(false);
+  const [quickDriver, setQuickDriver] = useState<Driver | null>(null);
+  const [savingDriver, setSavingDriver] = useState(false);
   const photoInputRef = useRef<HTMLInputElement>(null);
   const lastTrigger = useRef(openTrigger);
 
@@ -111,6 +131,23 @@ export default function ReportsTab({
     setEditing({ ...editing, driverId: d.id, driverLast: d.lastName, driverFirst: d.firstName, dept: d.dept || editing.dept });
   }
 
+  async function handleQuickDriverSave() {
+    if (!quickDriver || !editing) return;
+    if (!quickDriver.lastName || !quickDriver.firstName) {
+      alert('氏名（姓・名）は必須です。');
+      return;
+    }
+    const rec: Driver = { ...quickDriver, id: quickDriver.id || genId('d') };
+    setSavingDriver(true);
+    try {
+      await onSaveDriver(rec);
+      setEditing({ ...editing, driverId: rec.id, driverLast: rec.lastName, driverFirst: rec.firstName, dept: rec.dept || editing.dept });
+      setQuickDriver(null);
+    } finally {
+      setSavingDriver(false);
+    }
+  }
+
   function selectVehicle(id: string) {
     if (!editing) return;
     const v = data.vehicles.find((x) => x.id === id);
@@ -130,14 +167,15 @@ export default function ReportsTab({
 
   async function handleSubmit() {
     if (!editing) return;
-    if (!editing.driverLast || !editing.vehicleId || !editing.destination) {
-      alert('運転者・車両・行先は必須です。');
+    if (!editing.driverLast || !editing.driverFirst || !editing.vehicleId || !editing.destination) {
+      alert('運転者（姓・名）・車両・行先は必須です。');
       return;
     }
     const tripKm = editing.postDone ? Math.max(0, (editing.endKm || 0) - (editing.startKm || 0)) : 0;
+    const driver = `${editing.driverLast} ${editing.driverFirst}`.trim();
     setSaving(true);
     try {
-      await onSave({ ...editing, tripKm });
+      await onSave({ ...editing, driver, tripKm });
       setEditing(null);
     } finally {
       setSaving(false);
@@ -212,7 +250,9 @@ export default function ReportsTab({
                       {r.purpose ? ` / ${r.purpose}` : ''}
                     </td>
                     <td>
-                      {parseFloat(r.preAlcohol || '0') > 0 ? (
+                      {r.alcoholSkipped ? (
+                        <span className="pill pill-slate">免除</span>
+                      ) : parseFloat(r.preAlcohol || '0') > 0 ? (
                         <span className="pill pill-red">{r.preAlcohol}mg/L</span>
                       ) : (
                         <span className="pill pill-green">0.00</span>
@@ -256,7 +296,8 @@ export default function ReportsTab({
 
       {editing && (
         <Modal
-          title={editing.id ? '日報を編集' : '出発登録（運転前）'}
+          tone="dark"
+          title={editing.postDone ? '【帰着後】日報を編集' : editing.id ? '【運転前】出発登録を編集' : '【運転前】出発登録 & アルコール点呼'}
           onClose={() => setEditing(null)}
           footer={
             <>
@@ -264,19 +305,40 @@ export default function ReportsTab({
                 キャンセル
               </button>
               <button className="btn btn-primary" onClick={handleSubmit} disabled={saving}>
-                {saving ? '保存中…' : '保存する'}
+                {saving ? '保存中…' : editing.id ? '保存する' : '出発を登録する（運行開始）'}
               </button>
             </>
           }
         >
-          <div className="section-heading">基本情報</div>
-          <div className="field-row">
+          <div className="driverpick-row">
             <div className="field">
-              <label>利用日</label>
+              <label>登録運転者から選択:</label>
+              <select value={editing.driverId || ''} onChange={(e) => selectDriver(e.target.value)}>
+                <option value="">-- 台帳から選択 --</option>
+                {data.drivers.map((d) => (
+                  <option key={d.id} value={d.id}>
+                    {d.lastName} {d.firstName}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <button
+              type="button"
+              className="btn btn-sm"
+              style={{ background: 'var(--green-50, #ecfdf5)', borderColor: 'var(--green-100, #a7f3d0)', color: 'var(--green-600)' }}
+              onClick={() => setQuickDriver(emptyQuickDriver(data))}
+            >
+              🚗 本人登録
+            </button>
+          </div>
+
+          <div className="field-row-4" style={{ marginBottom: 12 }}>
+            <div className="field">
+              <label>利用日 *</label>
               <input type="date" value={editing.date} onChange={(e) => setEditing({ ...editing, date: e.target.value })} />
             </div>
             <div className="field">
-              <label>事業部・部署</label>
+              <label>事業部 *</label>
               <select value={editing.dept} onChange={(e) => setEditing({ ...editing, dept: e.target.value })}>
                 {data.masters.departments.map((d) => (
                   <option key={d} value={d}>
@@ -285,22 +347,19 @@ export default function ReportsTab({
                 ))}
               </select>
             </div>
-          </div>
-
-          <div className="field-row">
             <div className="field">
-              <label>運転者</label>
-              <select value={editing.driverId || ''} onChange={(e) => selectDriver(e.target.value)}>
-                <option value="">選択してください</option>
-                {data.drivers.map((d) => (
-                  <option key={d.id} value={d.id}>
-                    {d.lastName} {d.firstName}
-                  </option>
-                ))}
-              </select>
+              <label>運転者(姓) *</label>
+              <input value={editing.driverLast} onChange={(e) => setEditing({ ...editing, driverLast: e.target.value })} />
             </div>
             <div className="field">
-              <label>使用車両</label>
+              <label>運転者(名) *</label>
+              <input value={editing.driverFirst} onChange={(e) => setEditing({ ...editing, driverFirst: e.target.value })} />
+            </div>
+          </div>
+
+          <div className="field-row-4" style={{ marginBottom: 12 }}>
+            <div className="field">
+              <label>使用車両 *</label>
               <select value={editing.vehicleId} onChange={(e) => selectVehicle(e.target.value)}>
                 <option value="">選択してください</option>
                 {data.vehicles.map((v) => (
@@ -310,11 +369,8 @@ export default function ReportsTab({
                 ))}
               </select>
             </div>
-          </div>
-
-          <div className="field-row">
             <div className="field">
-              <label>行先</label>
+              <label>行先 *</label>
               <input value={editing.destination} onChange={(e) => setEditing({ ...editing, destination: e.target.value })} />
             </div>
             <div className="field">
@@ -323,27 +379,27 @@ export default function ReportsTab({
             </div>
           </div>
 
-          <div className="section-heading">出発前点呼・アルコールチェック</div>
-          <div className="field-row">
+          <div className="section-heading-row">
+            <div className="section-heading">●【運転前】アルコールチェック &amp; 簡易点検</div>
+            <label className="checkbox-field">
+              <input type="checkbox" checked={!!editing.alcoholSkipped} onChange={(e) => setEditing({ ...editing, alcoholSkipped: e.target.checked })} />
+              アルコールチェックをパス（免除）
+            </label>
+          </div>
+          <div className="field-row-4" style={{ marginBottom: 4 }}>
             <div className="field">
-              <label>点呼時刻</label>
+              <label>出発時刻</label>
               <input type="time" value={editing.preTime} onChange={(e) => setEditing({ ...editing, preTime: e.target.value })} />
             </div>
             <div className="field">
-              <label>アルコール濃度（mg/L）</label>
-              <input type="number" step="0.01" value={editing.preAlcohol} onChange={(e) => setEditing({ ...editing, preAlcohol: e.target.value })} />
-            </div>
-          </div>
-          <div className="field-row">
-            <div className="field">
-              <label>確認者</label>
-              <select value={editing.preChecker} onChange={(e) => setEditing({ ...editing, preChecker: e.target.value })}>
-                {data.masters.checkers.map((c) => (
-                  <option key={c} value={c}>
-                    {c}
-                  </option>
-                ))}
-              </select>
+              <label>検知器測定値（mg/L）</label>
+              <input
+                type="number"
+                step="0.01"
+                value={editing.preAlcohol}
+                disabled={!!editing.alcoholSkipped}
+                onChange={(e) => setEditing({ ...editing, preAlcohol: e.target.value })}
+              />
             </div>
             <div className="field">
               <label>確認方法</label>
@@ -355,15 +411,30 @@ export default function ReportsTab({
                 ))}
               </select>
             </div>
+            <div className="field">
+              <label>確認者</label>
+              <select value={editing.preChecker} onChange={(e) => setEditing({ ...editing, preChecker: e.target.value })}>
+                {data.masters.checkers.map((c) => (
+                  <option key={c} value={c}>
+                    {c}
+                  </option>
+                ))}
+              </select>
+            </div>
           </div>
-          <div className="field">
+          <div className="check-row">
             <label className="checkbox-field">
-              <input type="checkbox" checked={editing.preCheckOk} onChange={(e) => setEditing({ ...editing, preCheckOk: e.target.checked })} />
-              目視・日常点検を実施し異常なし
+              <input type="checkbox" checked={editing.tireOk} onChange={(e) => setEditing({ ...editing, tireOk: e.target.checked })} />
+              タイヤ空気圧・外観キズ異常なし
+            </label>
+            <label className="checkbox-field">
+              <input type="checkbox" checked={editing.brakeOk} onChange={(e) => setEditing({ ...editing, brakeOk: e.target.checked })} />
+              ブレーキ・ランプ点灯良好
             </label>
           </div>
+
           <div className="field">
-            <label>出発時 走行距離（km）</label>
+            <label>出発時メーター（km） *</label>
             <input type="number" value={editing.startKm} onChange={(e) => setEditing({ ...editing, startKm: Number(e.target.value) })} />
           </div>
           <div className="field">
@@ -390,7 +461,6 @@ export default function ReportsTab({
             />
           </div>
 
-          <div className="section-heading">帰着報告</div>
           <div className="field">
             <label className="checkbox-field">
               <input
@@ -406,12 +476,13 @@ export default function ReportsTab({
                   })
                 }
               />
-              帰着済み（帰着後点呼を実施）
+              帰着情報（運転後）も同時に今すぐ一括入力する
             </label>
           </div>
           {editing.postDone && (
             <>
-              <div className="field-row">
+              <div className="section-heading">帰着後点呼</div>
+              <div className="field-row-4">
                 <div className="field">
                   <label>帰着時刻</label>
                   <input type="time" value={editing.postTime} onChange={(e) => setEditing({ ...editing, postTime: e.target.value })} />
@@ -420,12 +491,10 @@ export default function ReportsTab({
                   <label>アルコール濃度（mg/L）</label>
                   <input type="number" step="0.01" value={editing.postAlcohol} onChange={(e) => setEditing({ ...editing, postAlcohol: e.target.value })} />
                 </div>
-              </div>
-              <div className="field-row">
                 <div className="field">
-                  <label>確認者</label>
-                  <select value={editing.postChecker} onChange={(e) => setEditing({ ...editing, postChecker: e.target.value })}>
-                    {data.masters.checkers.map((c) => (
+                  <label>確認方法</label>
+                  <select value={editing.postMethod} onChange={(e) => setEditing({ ...editing, postMethod: e.target.value })}>
+                    {data.masters.checkMethods.map((c) => (
                       <option key={c} value={c}>
                         {c}
                       </option>
@@ -433,9 +502,9 @@ export default function ReportsTab({
                   </select>
                 </div>
                 <div className="field">
-                  <label>確認方法</label>
-                  <select value={editing.postMethod} onChange={(e) => setEditing({ ...editing, postMethod: e.target.value })}>
-                    {data.masters.checkMethods.map((c) => (
+                  <label>確認者</label>
+                  <select value={editing.postChecker} onChange={(e) => setEditing({ ...editing, postChecker: e.target.value })}>
+                    {data.masters.checkers.map((c) => (
                       <option key={c} value={c}>
                         {c}
                       </option>
@@ -453,6 +522,69 @@ export default function ReportsTab({
           <div className="field">
             <label>特記事項</label>
             <textarea rows={2} value={editing.notes} onChange={(e) => setEditing({ ...editing, notes: e.target.value })} />
+          </div>
+        </Modal>
+      )}
+
+      {quickDriver && (
+        <Modal
+          title="🚗 本人登録（簡易運転者登録）"
+          onClose={() => setQuickDriver(null)}
+          footer={
+            <>
+              <button className="btn" onClick={() => setQuickDriver(null)}>
+                キャンセル
+              </button>
+              <button className="btn btn-primary" onClick={handleQuickDriverSave} disabled={savingDriver}>
+                {savingDriver ? '登録中…' : 'この内容で登録して選択する'}
+              </button>
+            </>
+          }
+        >
+          <div className="field-row">
+            <div className="field">
+              <label>氏名（姓）*</label>
+              <input value={quickDriver.lastName} onChange={(e) => setQuickDriver({ ...quickDriver, lastName: e.target.value })} />
+            </div>
+            <div className="field">
+              <label>氏名（名）*</label>
+              <input value={quickDriver.firstName} onChange={(e) => setQuickDriver({ ...quickDriver, firstName: e.target.value })} />
+            </div>
+          </div>
+          <div className="field-row">
+            <div className="field">
+              <label>所属事業部</label>
+              <select value={quickDriver.dept} onChange={(e) => setQuickDriver({ ...quickDriver, dept: e.target.value })}>
+                {data.masters.departments.map((d) => (
+                  <option key={d} value={d}>
+                    {d}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div className="field">
+              <label>免許種別</label>
+              <select value={quickDriver.licenseType} onChange={(e) => setQuickDriver({ ...quickDriver, licenseType: e.target.value })}>
+                {data.masters.licenseTypes.map((t) => (
+                  <option key={t} value={t}>
+                    {t}
+                  </option>
+                ))}
+              </select>
+            </div>
+          </div>
+          <div className="field-row">
+            <div className="field">
+              <label>連絡先電話番号</label>
+              <input value={quickDriver.phone} onChange={(e) => setQuickDriver({ ...quickDriver, phone: e.target.value })} />
+            </div>
+            <div className="field">
+              <label>免許更新期日</label>
+              <input type="date" value={quickDriver.licenseExpiry} onChange={(e) => setQuickDriver({ ...quickDriver, licenseExpiry: e.target.value })} />
+            </div>
+          </div>
+          <div style={{ fontSize: 11.5, color: 'var(--slate-500)' }}>
+            簡易登録です。免許証番号など詳細情報は「運転者台帳・免許」タブからいつでも追記できます。
           </div>
         </Modal>
       )}

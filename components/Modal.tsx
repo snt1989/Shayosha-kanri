@@ -7,16 +7,20 @@ export default function Modal({
   onClose,
   children,
   footer,
+  tone,
+  wide,
 }: {
   title: string;
   onClose: () => void;
   children: ReactNode;
   footer?: ReactNode;
+  tone?: 'dark';
+  wide?: boolean;
 }) {
   return (
     <div className="modal-backdrop" onMouseDown={(e) => { if (e.target === e.currentTarget) onClose(); }}>
-      <div className="modal-box">
-        <div className="modal-header">
+      <div className={`modal-box${wide ? ' modal-box-wide' : ''}`}>
+        <div className={`modal-header${tone === 'dark' ? ' modal-header-dark' : ''}`}>
           <h2>{title}</h2>
           <button className="modal-close" onClick={onClose} aria-label="閉じる">
             ×
