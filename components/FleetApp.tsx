@@ -83,10 +83,20 @@ export default function FleetApp() {
   }
 
   async function saveReport(r: Report) {
-    return withSync(() => jsonFetch('/api/reports', { method: 'POST', body: JSON.stringify(r) }));
+    try {
+      return await withSync(() => jsonFetch('/api/reports', { method: 'POST', body: JSON.stringify(r) }));
+    } catch (e) {
+      handleAdminApiError(e);
+      throw e;
+    }
   }
   async function deleteReport(id: string) {
-    return withSync(() => jsonFetch(`/api/reports/${id}`, { method: 'DELETE' }));
+    try {
+      return await withSync(() => jsonFetch(`/api/reports/${id}`, { method: 'DELETE' }));
+    } catch (e) {
+      handleAdminApiError(e);
+      throw e;
+    }
   }
   async function saveVehicle(v: Vehicle) {
     return withSync(() => jsonFetch('/api/vehicles', { method: 'POST', body: JSON.stringify(v) }));
@@ -208,6 +218,8 @@ export default function FleetApp() {
               onDelete={deleteReport}
               onSaveDriver={saveDriver}
               openTrigger={quickReportTrigger}
+              isAdmin={isAdmin}
+              onRequestLogin={() => setShowAdminLogin(true)}
             />
           </>
         )}

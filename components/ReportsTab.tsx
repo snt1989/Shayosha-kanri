@@ -83,12 +83,16 @@ export default function ReportsTab({
   onDelete,
   onSaveDriver,
   openTrigger,
+  isAdmin,
+  onRequestLogin,
 }: {
   data: AppData;
   onSave: (r: Report) => Promise<unknown>;
   onDelete: (id: string) => Promise<unknown>;
   onSaveDriver: (d: Driver) => Promise<unknown>;
   openTrigger?: number;
+  isAdmin: boolean;
+  onRequestLogin: () => void;
 }) {
   const [query, setQuery] = useState('');
   const [editing, setEditing] = useState<Report | null>(null);
@@ -125,6 +129,10 @@ export default function ReportsTab({
     setEditing(emptyReport(data));
   }
   function openEdit(r: Report) {
+    if (!isAdmin) {
+      onRequestLogin();
+      return;
+    }
     setEditing({ ...r });
   }
   function openReturnCheckin(r: Report) {
@@ -199,6 +207,10 @@ export default function ReportsTab({
   }
 
   async function handleDelete(id: string) {
+    if (!isAdmin) {
+      onRequestLogin();
+      return;
+    }
     if (!confirm('この日報を削除しますか？')) return;
     await onDelete(id);
   }
@@ -217,6 +229,7 @@ export default function ReportsTab({
             </h3>
             <div style={{ fontSize: 12, color: 'var(--slate-500)' }}>
               運転前後の酒気帯び確認・簡易点検・実走行kmを記録保管します。
+              確定済み日報の編集・削除は管理者ログインが必要です。
             </div>
           </div>
           <div className="actions">
@@ -307,10 +320,10 @@ export default function ReportsTab({
                     </td>
                     <td>
                       <button className="btn btn-sm" onClick={() => openEdit(r)}>
-                        編集
+                        {isAdmin ? '編集' : '🔒 編集'}
                       </button>{' '}
                       <button className="btn btn-sm btn-danger" onClick={() => handleDelete(r.id)}>
-                        削除
+                        {isAdmin ? '削除' : '🔒 削除'}
                       </button>
                     </td>
                   </tr>

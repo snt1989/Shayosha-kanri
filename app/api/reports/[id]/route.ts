@@ -1,12 +1,16 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { loadData, saveData } from '@/lib/store';
+import { ADMIN_COOKIE, isAdminCookieValid } from '@/lib/admin';
 
 export const dynamic = 'force-dynamic';
 
 export async function DELETE(
-  _req: NextRequest,
+  req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
+  if (!isAdminCookieValid(req.cookies.get(ADMIN_COOKIE)?.value)) {
+    return NextResponse.json({ success: false, message: '日報の削除には管理者ログインが必要です。' }, { status: 401 });
+  }
   const { id } = await params;
   const data = await loadData();
   const before = data.reports.length;

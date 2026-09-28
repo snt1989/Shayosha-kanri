@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { loadData, saveData } from '@/lib/store';
 import { Report } from '@/lib/types';
+import { ADMIN_COOKIE, isAdminCookieValid } from '@/lib/admin';
 
 export const dynamic = 'force-dynamic';
 
@@ -13,6 +14,18 @@ export async function POST(req: NextRequest) {
 
   const data = await loadData();
   const idx = data.reports.findIndex((x) => x.id === r.id);
+
+  // 既に「帰着済」として確定している日報の再編集（内容の書き換え）は、記録の改ざん防止のため
+  // 管理者ログイン必須とする。新規登録や、まだ出庫中の日報を自分で帰着登録する操作は誰でも可能。
+  if (idx >= 0 && data.reports[idx].postDone) {
+    if (!isAdminCookieValid(req.cookies.get(ADMIN_COOKIE)?.value)) {
+      return NextResponse.json(
+        { success: false, message: '確定済みの日報を編集するには管理者ログインが必要です。' },
+        { status: 401 }
+      );
+    }
+  }
+
   if (idx >= 0) {
     data.reports[idx] = r;
   } else {
