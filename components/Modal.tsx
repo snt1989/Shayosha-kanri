@@ -15,11 +15,11 @@ export default function Modal({
   children: ReactNode;
   footer?: ReactNode;
   tone?: 'dark';
-  wide?: boolean;
+  wide?: boolean | 'x';
 }) {
   return (
     <div className="modal-backdrop" onMouseDown={(e) => { if (e.target === e.currentTarget) onClose(); }}>
-      <div className={`modal-box${wide ? ' modal-box-wide' : ''}`}>
+      <div className={`modal-box${wide === 'x' ? ' modal-box-xwide' : wide ? ' modal-box-wide' : ''}`}>
         <div className={`modal-header${tone === 'dark' ? ' modal-header-dark' : ''}`}>
           <h2>{title}</h2>
           <button className="modal-close" onClick={onClose} aria-label="閉じる">

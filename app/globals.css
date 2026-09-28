@@ -425,6 +425,10 @@ table.data-table {
   max-width: 760px;
 }
 
+.modal-box-xwide {
+  max-width: 1180px;
+}
+
 .modal-header {
   display: flex;
   align-items: center;
@@ -954,6 +958,95 @@ table.data-table {
   border-radius: 9px;
   font-size: 12.5px;
   resize: vertical;
+}
+
+/* Bulk vehicle grid editor */
+.bulk-grid-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 8px;
+  flex-wrap: wrap;
+}
+.bulk-grid-hint {
+  font-size: 11px;
+  color: var(--slate-500);
+}
+.bulk-grid-count {
+  font-size: 12.5px;
+  font-weight: 700;
+  color: var(--slate-600);
+}
+.bulk-grid-wrap {
+  overflow-x: auto;
+  border: 1px solid var(--slate-200);
+  border-radius: 10px;
+}
+table.bulk-grid {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12.5px;
+}
+.bulk-grid th {
+  background: var(--slate-50);
+  color: var(--slate-600);
+  font-weight: 700;
+  text-align: left;
+  padding: 8px 8px;
+  border-bottom: 1px solid var(--slate-200);
+  white-space: nowrap;
+  position: sticky;
+  top: 0;
+}
+.bulk-grid td {
+  padding: 5px 6px;
+  border-bottom: 1px solid var(--slate-100);
+  vertical-align: middle;
+}
+.bulk-grid tr:hover td {
+  background: var(--slate-50);
+}
+.bulk-grid td.bulk-no {
+  color: var(--slate-400);
+  font-weight: 700;
+  text-align: center;
+  white-space: nowrap;
+}
+.bulk-grid input,
+.bulk-grid select {
+  width: 100%;
+  min-width: 92px;
+  padding: 6px 8px;
+  border: 1px solid var(--slate-300);
+  border-radius: 7px;
+  font-size: 12.5px;
+  background: #fff;
+  color: var(--slate-800);
+}
+.bulk-grid input[type='number'] {
+  min-width: 68px;
+}
+.bulk-grid input[type='date'] {
+  min-width: 128px;
+}
+.bulk-grid td.bulk-del {
+  text-align: center;
+}
+.bulk-grid-del-btn {
+  border: none;
+  background: transparent;
+  color: var(--red-600);
+  font-size: 15px;
+  padding: 4px 6px;
+  border-radius: 6px;
+  line-height: 1;
+}
+.bulk-grid-del-btn:hover {
+  background: var(--red-50);
+}
+.bulk-grid-add-row {
+  margin-bottom: 4px;
 }
 
 .reorder-table td.name-cell {

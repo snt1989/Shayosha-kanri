@@ -34,7 +34,7 @@ export default function VehiclesTab({
   const [editing, setEditing] = useState<Vehicle | null>(null);
   const [saving, setSaving] = useState(false);
   const [newMaint, setNewMaint] = useState<Partial<MaintRecord>>({});
-  const [bulkText, setBulkText] = useState<string | null>(null);
+  const [bulkRows, setBulkRows] = useState<Vehicle[] | null>(null);
   const [bulkSaving, setBulkSaving] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
 
@@ -104,18 +104,55 @@ export default function VehiclesTab({
   }
 
   function openBulkEdit() {
-    setBulkText(vehiclesToCsv(data.vehicles));
+    setBulkRows(data.vehicles.map((v) => ({ ...v, maintHistory: [...v.maintHistory] })));
+  }
+
+  function addBulkRow() {
+    setBulkRows((rows) => [
+      ...(rows || []),
+      {
+        id: genId('v'),
+        name: '',
+        plate: '',
+        modelType: '',
+        shakenDate: '',
+        checkDate: '',
+        odometer: 0,
+        oilKm: 3000,
+        tire: data.masters.tireTypes[0] || '',
+        maintHistory: [],
+      },
+    ]);
+  }
+
+  function updateBulkRow(idx: number, patch: Partial<Vehicle>) {
+    setBulkRows((rows) => {
+      if (!rows) return rows;
+      const list = [...rows];
+      list[idx] = { ...list[idx], ...patch };
+      return list;
+    });
+  }
+
+  function removeBulkRow(idx: number) {
+    setBulkRows((rows) => {
+      if (!rows) return rows;
+      const list = [...rows];
+      list.splice(idx, 1);
+      return list;
+    });
   }
 
   async function saveBulkEdit() {
-    if (bulkText === null) return;
+    if (bulkRows === null) return;
+    if (bulkRows.some((v) => !v.name.trim() || !v.plate.trim() || !v.shakenDate)) {
+      alert('車両呼称・ナンバープレート・車検満了日は全行で必須です。');
+      return;
+    }
     setBulkSaving(true);
     try {
-      const list = csvToVehicles(bulkText, data.vehicles);
-      await onBulkSave(list);
-      setBulkText(null);
-    } catch {
-      alert('CSVの形式を確認してください。');
+      await onBulkSave(bulkRows);
+      setBulkRows(null);
     } finally {
       setBulkSaving(false);
     }
@@ -361,26 +398,88 @@ export default function VehiclesTab({
         </Modal>
       )}
 
-      {bulkText !== null && (
+      {bulkRows !== null && (
         <Modal
-          title="車両台帳をまとめて一括編集"
-          onClose={() => setBulkText(null)}
+          title="社用車台帳 まとめて一括編集"
+          onClose={() => setBulkRows(null)}
+          wide="x"
           footer={
             <>
-              <button className="btn" onClick={() => setBulkText(null)}>
-                キャンセル
+              <button className="btn" onClick={() => setBulkRows(null)}>
+                破棄して閉じる
               </button>
               <button className="btn btn-primary" onClick={saveBulkEdit} disabled={bulkSaving}>
-                {bulkSaving ? '保存中…' : 'この内容で保存する'}
+                {bulkSaving ? '保存中…' : '✓ 変更を一括保存する'}
               </button>
             </>
           }
         >
-          <div className="notice-box">
-            CSV形式（1行目は見出し）で表示しています。Excelからそのままコピー＆貼り付けでも編集できます。id列を空にすると新規車両として追加されます。
+          <div className="bulk-grid-toolbar">
+            <button className="btn btn-sm bulk-grid-add-row" type="button" onClick={addBulkRow}>
+              ＋ 車両行を追加（+1台）
+            </button>
+            <span className="bulk-grid-hint">※各セルを直接クリックして文字や数値を書き換えてください</span>
+            <span className="bulk-grid-count">登録車両数: {bulkRows.length}台</span>
           </div>
-          <div className="bulk-paste">
-            <textarea value={bulkText} onChange={(e) => setBulkText(e.target.value)} spellCheck={false} />
+          <div className="bulk-grid-wrap">
+            <table className="bulk-grid">
+              <thead>
+                <tr>
+                  <th>No.</th>
+                  <th>車両呼称（車名/色）*</th>
+                  <th>ナンバープレート *</th>
+                  <th>型式</th>
+                  <th>車検満了日 *</th>
+                  <th>12ヶ月点検日</th>
+                  <th>現在積算（km）</th>
+                  <th>次回オイル目安</th>
+                  <th>装着タイヤ</th>
+                  <th>削除</th>
+                </tr>
+              </thead>
+              <tbody>
+                {bulkRows.map((v, idx) => (
+                  <tr key={v.id || idx}>
+                    <td className="bulk-no">{idx + 1}</td>
+                    <td>
+                      <input value={v.name} onChange={(e) => updateBulkRow(idx, { name: e.target.value })} />
+                    </td>
+                    <td>
+                      <input value={v.plate} onChange={(e) => updateBulkRow(idx, { plate: e.target.value })} />
+                    </td>
+                    <td>
+                      <input value={v.modelType} onChange={(e) => updateBulkRow(idx, { modelType: e.target.value })} />
+                    </td>
+                    <td>
+                      <input type="date" value={v.shakenDate} onChange={(e) => updateBulkRow(idx, { shakenDate: e.target.value })} />
+                    </td>
+                    <td>
+                      <input type="date" value={v.checkDate} onChange={(e) => updateBulkRow(idx, { checkDate: e.target.value })} />
+                    </td>
+                    <td>
+                      <input type="number" value={v.odometer} onChange={(e) => updateBulkRow(idx, { odometer: Number(e.target.value) })} />
+                    </td>
+                    <td>
+                      <input type="number" value={v.oilKm} onChange={(e) => updateBulkRow(idx, { oilKm: Number(e.target.value) })} />
+                    </td>
+                    <td>
+                      <select value={v.tire} onChange={(e) => updateBulkRow(idx, { tire: e.target.value })}>
+                        {data.masters.tireTypes.map((t) => (
+                          <option key={t} value={t}>
+                            {t}
+                          </option>
+                        ))}
+                      </select>
+                    </td>
+                    <td className="bulk-del">
+                      <button className="bulk-grid-del-btn" type="button" onClick={() => removeBulkRow(idx)} aria-label="この行を削除">
+                        🗑
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           </div>
         </Modal>
       )}
