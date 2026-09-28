@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react';
 import { AppData, Driver, Masters, Report, Vehicle } from '@/lib/types';
 import Header from './Header';
 import StatBar from './StatBar';
-import AlertsPanel from './AlertsPanel';
+import DashboardTab from './DashboardTab';
 import ReportsTab from './ReportsTab';
 import VehiclesTab from './VehiclesTab';
 import DriversTab from './DriversTab';
@@ -12,7 +12,7 @@ import MastersTab from './MastersTab';
 import LogsTab from './LogsTab';
 import AdminLoginModal from './AdminLoginModal';
 
-type Tab = 'reports' | 'vehicles' | 'drivers' | 'masters' | 'logs';
+type Tab = 'dashboard' | 'reports' | 'vehicles' | 'drivers' | 'masters' | 'logs';
 type SyncStatus = 'idle' | 'saving' | 'error';
 
 async function jsonFetch(url: string, init?: RequestInit) {
@@ -30,7 +30,7 @@ async function jsonFetch(url: string, init?: RequestInit) {
 }
 
 export default function FleetApp() {
-  const [tab, setTab] = useState<Tab>('reports');
+  const [tab, setTab] = useState<Tab>('dashboard');
   const [data, setData] = useState<AppData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -218,19 +218,17 @@ export default function FleetApp() {
       </div>
 
       <main className="main">
+        {tab === 'dashboard' && <DashboardTab data={data} />}
         {tab === 'reports' && (
-          <>
-            <AlertsPanel data={data} />
-            <ReportsTab
-              data={data}
-              onSave={saveReport}
-              onDelete={deleteReport}
-              onSaveDriver={saveDriver}
-              openTrigger={quickReportTrigger}
-              isAdmin={isAdmin}
-              onRequestLogin={() => setShowAdminLogin(true)}
-            />
-          </>
+          <ReportsTab
+            data={data}
+            onSave={saveReport}
+            onDelete={deleteReport}
+            onSaveDriver={saveDriver}
+            openTrigger={quickReportTrigger}
+            isAdmin={isAdmin}
+            onRequestLogin={() => setShowAdminLogin(true)}
+          />
         )}
         {tab === 'vehicles' && (
           <VehiclesTab data={data} onSave={saveVehicle} onDelete={deleteVehicle} onBulkSave={bulkSaveVehicles} />

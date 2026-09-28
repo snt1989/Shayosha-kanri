@@ -3,7 +3,7 @@
 import { AppData } from '@/lib/types';
 import { daysUntil } from '@/lib/utils';
 
-export default function AlertsPanel({ data }: { data: AppData }) {
+export default function AlertsPanel({ data, standalone }: { data: AppData; standalone?: boolean }) {
   const shakenAlerts = data.vehicles
     .map((v) => ({ v, days: daysUntil(v.shakenDate) }))
     .filter((x) => x.days !== null && (x.days as number) <= 30)
@@ -21,7 +21,15 @@ export default function AlertsPanel({ data }: { data: AppData }) {
   );
 
   const total = shakenAlerts.length + oilAlerts.length + licenseAlerts.length + ngAlcohol.length;
-  if (total === 0) return null;
+
+  if (total === 0) {
+    if (!standalone) return null;
+    return (
+      <div className="card">
+        <div className="empty-state">🎉 現在、対応が必要なアラートはありません</div>
+      </div>
+    );
+  }
 
   return (
     <div className="grid grid-2">

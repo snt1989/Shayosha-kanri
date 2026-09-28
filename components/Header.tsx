@@ -1,9 +1,10 @@
 'use client';
 
-type Tab = 'reports' | 'vehicles' | 'drivers' | 'masters' | 'logs';
+type Tab = 'dashboard' | 'reports' | 'vehicles' | 'drivers' | 'masters' | 'logs';
 type SyncStatus = 'idle' | 'saving' | 'error';
 
 const TABS: { key: Tab; label: string; icon: string; admin?: boolean }[] = [
+  { key: 'dashboard', label: 'ダッシュボード', icon: '📊' },
   { key: 'reports', label: '運転日報・点呼記録', icon: '📝' },
   { key: 'vehicles', label: '社用車台帳・車検', icon: '🚗' },
   { key: 'drivers', label: '運転者台帳・免許', icon: '🪪' },
