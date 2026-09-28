@@ -1,6 +1,6 @@
 'use client';
 
-type Tab = 'dashboard' | 'reports' | 'vehicles' | 'drivers' | 'masters' | 'logs';
+type Tab = 'dashboard' | 'reports' | 'vehicles' | 'drivers' | 'admin';
 type SyncStatus = 'idle' | 'saving' | 'error';
 
 const TABS: { key: Tab; label: string; icon: string; admin?: boolean }[] = [
@@ -8,8 +8,7 @@ const TABS: { key: Tab; label: string; icon: string; admin?: boolean }[] = [
   { key: 'reports', label: '運転日報・点呼記録', icon: '📝' },
   { key: 'vehicles', label: '社用車台帳・車検', icon: '🚗' },
   { key: 'drivers', label: '運転者台帳・免許', icon: '🪪' },
-  { key: 'masters', label: '各種マスタ設定', icon: '⚙️', admin: true },
-  { key: 'logs', label: '操作ログ・バックアップ', icon: '🗂️', admin: true },
+  { key: 'admin', label: '管理画面', icon: '🛠️', admin: true },
 ];
 
 export default function Header({

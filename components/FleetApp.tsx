@@ -8,11 +8,10 @@ import DashboardTab from './DashboardTab';
 import ReportsTab from './ReportsTab';
 import VehiclesTab from './VehiclesTab';
 import DriversTab from './DriversTab';
-import MastersTab from './MastersTab';
-import LogsTab from './LogsTab';
+import AdminTab from './AdminTab';
 import AdminLoginModal from './AdminLoginModal';
 
-type Tab = 'dashboard' | 'reports' | 'vehicles' | 'drivers' | 'masters' | 'logs';
+type Tab = 'dashboard' | 'reports' | 'vehicles' | 'drivers' | 'admin';
 type SyncStatus = 'idle' | 'saving' | 'error';
 
 async function jsonFetch(url: string, init?: RequestInit) {
@@ -236,21 +235,13 @@ export default function FleetApp() {
         {tab === 'drivers' && (
           <DriversTab data={data} onSave={saveDriver} onDelete={deleteDriver} onBulkSave={bulkSaveDrivers} />
         )}
-        {tab === 'masters' && (
-          <MastersTab
-            masters={data.masters}
+        {tab === 'admin' && (
+          <AdminTab
+            data={data}
             isAdmin={isAdmin}
             adminConfigured={adminConfigured}
             onSaveCategory={saveMasterCategory}
             onSaveAll={saveAllMasters}
-            onRequestLogin={() => setShowAdminLogin(true)}
-          />
-        )}
-        {tab === 'logs' && (
-          <LogsTab
-            data={data}
-            isAdmin={isAdmin}
-            adminConfigured={adminConfigured}
             onRequestLogin={() => setShowAdminLogin(true)}
             onClearLogs={clearLogs}
           />
