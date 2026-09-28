@@ -21,7 +21,8 @@ async function jsonFetch(url: string, init?: RequestInit) {
   });
   const body = await res.json().catch(() => ({}));
   if (!res.ok) {
-    const err = new Error(body?.message || `リクエストに失敗しました (${res.status})`);
+    const err: Error & { status?: number } = new Error(body?.message || `リクエストに失敗しました (${res.status})`);
+    err.status = res.status;
     throw err;
   }
   return body;
@@ -105,11 +106,30 @@ export default function FleetApp() {
   async function bulkSaveDrivers(list: Driver[]) {
     return withSync(() => jsonFetch('/api/drivers/bulk', { method: 'POST', body: JSON.stringify(list) }));
   }
+  function handleAdminApiError(e: unknown) {
+    const status = (e as { status?: number } | null)?.status;
+    if (status === 401) {
+      // 管理者セッションが無効（ログアウト済み・期限切れ・Cookie破棄など）。
+      // 画面側の状態を必ず「未ログイン」に合わせ、管理マスタ画面をその場で再ロックする。
+      setIsAdmin(false);
+      alert('管理者セッションが無効です（ログアウト済み、または期限切れ）。再度ログインしてください。');
+    }
+  }
   async function saveMasterCategory(category: keyof Masters, items: string[]) {
-    return withSync(() => jsonFetch('/api/masters', { method: 'POST', body: JSON.stringify({ category, items }) }));
+    try {
+      return await withSync(() => jsonFetch('/api/masters', { method: 'POST', body: JSON.stringify({ category, items }) }));
+    } catch (e) {
+      handleAdminApiError(e);
+      throw e;
+    }
   }
   async function saveAllMasters(masters: Masters) {
-    return withSync(() => jsonFetch('/api/masters/all', { method: 'POST', body: JSON.stringify(masters) }));
+    try {
+      return await withSync(() => jsonFetch('/api/masters/all', { method: 'POST', body: JSON.stringify(masters) }));
+    } catch (e) {
+      handleAdminApiError(e);
+      throw e;
+    }
   }
 
   async function handleAdminLogin(password: string) {

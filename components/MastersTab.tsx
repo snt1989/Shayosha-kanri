@@ -65,6 +65,8 @@ export default function MastersTab({
     setBusy(true);
     try {
       await onSaveCategory(activeCat, list);
+    } catch {
+      // 401等はFleetApp側でログアウト状態への復帰・通知まで処理済みなので、ここでは何もしない
     } finally {
       setBusy(false);
     }
@@ -126,6 +128,8 @@ export default function MastersTab({
       setBusy(true);
       try {
         await onSaveAll(imported);
+      } catch {
+        // 401等はFleetApp側で処理済み
       } finally {
         setBusy(false);
       }
