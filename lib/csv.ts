@@ -1,4 +1,4 @@
-import { Driver, Vehicle } from './types';
+import { Driver, MASTER_KEYS, MASTER_LABELS, MasterKey, Masters, Vehicle } from './types';
 import { genId } from './utils';
 
 function csvEscape(v: unknown): string {
@@ -118,6 +118,39 @@ export function csvToDrivers(text: string): Driver[] {
     licenseNo: (r[8] || '').trim(),
     notes: (r[9] || '').trim(),
   }));
+}
+
+/* ---------- masters ---------- */
+const MASTER_HEADERS = ['カテゴリキー', 'カテゴリ名', '登録名称'];
+
+export function mastersToCsv(masters: Masters): string {
+  const rows: (string | number)[][] = [MASTER_HEADERS];
+  MASTER_KEYS.forEach((key) => {
+    (masters[key] || []).forEach((name) => {
+      rows.push([key, MASTER_LABELS[key], name]);
+    });
+  });
+  return toCsv(rows);
+}
+
+export function csvToMasters(text: string): Masters {
+  const rows = parseCsv(text);
+  const result = { departments: [], checkers: [], checkMethods: [], maintTypes: [], tireTypes: [], licenseTypes: [] } as Masters;
+  if (rows.length === 0) return result;
+  const masterKeySet: readonly string[] = MASTER_KEYS;
+  const labelToKey = new Map<string, MasterKey>(MASTER_KEYS.map((k) => [MASTER_LABELS[k], k]));
+  const startIdx = masterKeySet.includes(rows[0][0]) || labelToKey.has(rows[0][0]) ? 0 : 1;
+  for (let i = startIdx; i < rows.length; i++) {
+    const r = rows[i];
+    const rawKey = (r[0] || '').trim();
+    const rawLabel = (r[1] || '').trim();
+    const name = (r[2] || '').trim();
+    if (!name) continue;
+    const key: MasterKey | undefined = masterKeySet.includes(rawKey) ? (rawKey as MasterKey) : labelToKey.get(rawKey) || labelToKey.get(rawLabel);
+    if (!key) continue;
+    result[key].push(name);
+  }
+  return result;
 }
 
 export function downloadCsv(filename: string, csv: string) {

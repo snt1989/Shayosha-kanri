@@ -1,7 +1,9 @@
 'use client';
 
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { MASTER_KEYS, MASTER_LABELS, MasterKey, Masters } from '@/lib/types';
+import { csvToMasters, downloadCsv, mastersToCsv } from '@/lib/csv';
+import { todayStr } from '@/lib/utils';
 
 const ICONS: Record<MasterKey, string> = {
   departments: '🏢',
@@ -17,12 +19,14 @@ export default function MastersTab({
   isAdmin,
   adminConfigured,
   onSaveCategory,
+  onSaveAll,
   onRequestLogin,
 }: {
   masters: Masters;
   isAdmin: boolean;
   adminConfigured: boolean;
   onSaveCategory: (category: MasterKey, items: string[]) => Promise<unknown>;
+  onSaveAll: (masters: Masters) => Promise<unknown>;
   onRequestLogin: () => void;
 }) {
   const [activeCat, setActiveCat] = useState<MasterKey>('departments');
@@ -30,6 +34,7 @@ export default function MastersTab({
   const [busy, setBusy] = useState(false);
   const [editIdx, setEditIdx] = useState<number | null>(null);
   const [editVal, setEditVal] = useState('');
+  const csvFileRef = useRef<HTMLInputElement>(null);
 
   if (!isAdmin) {
     return (
@@ -98,6 +103,37 @@ export default function MastersTab({
     await persist(list);
   }
 
+  function exportAllCsv() {
+    downloadCsv(`マスタ設定_${todayStr()}.csv`, mastersToCsv(masters));
+  }
+
+  function triggerCsvImport() {
+    csvFileRef.current?.click();
+  }
+
+  function handleCsvFile(file: File | null) {
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = async () => {
+      const text = String(reader.result || '');
+      const imported = csvToMasters(text);
+      const totalCount = MASTER_KEYS.reduce((sum, k) => sum + imported[k].length, 0);
+      if (totalCount === 0) {
+        alert('CSVから有効なデータを読み取れませんでした。「カテゴリキー,カテゴリ名,登録名称」の形式で出力したCSVをご利用ください。');
+        return;
+      }
+      if (!confirm(`CSVから読み取った${totalCount}件で全マスタ（全カテゴリ）を上書きします。よろしいですか？`)) return;
+      setBusy(true);
+      try {
+        await onSaveAll(imported);
+      } finally {
+        setBusy(false);
+      }
+    };
+    reader.readAsText(file, 'utf-8');
+    if (csvFileRef.current) csvFileRef.current.value = '';
+  }
+
   function startEdit(idx: number) {
     setEditIdx(idx);
     setEditVal(items[idx]);
@@ -115,11 +151,27 @@ export default function MastersTab({
 
   return (
     <div className="card">
-      <h3 className="card-title" style={{ marginBottom: 4 }}>
-        ⚙️ 各種プルダウン・マスタ一括管理
-      </h3>
-      <div style={{ fontSize: 12, color: 'var(--slate-500)', marginBottom: 16 }}>
-        事業部、点呼確認者、確認方法、点検区分などの選択肢を自由に設定・編集できます。
+      <div className="toolbar2" style={{ marginBottom: 4, alignItems: 'flex-start' }}>
+        <div>
+          <h3 className="card-title" style={{ marginBottom: 4 }}>
+            ⚙️ 各種プルダウン・マスタ一括管理
+          </h3>
+          <div style={{ fontSize: 12, color: 'var(--slate-500)' }}>
+            事業部、点呼確認者、確認方法、点検区分などの選択肢を自由に設定・編集できます。
+          </div>
+        </div>
+        <div className="actions">
+          <button className="btn btn-sm" onClick={triggerCsvImport} disabled={busy}>
+            ⬆ 全マスタCSV取込
+          </button>
+          <button className="btn btn-sm" onClick={exportAllCsv}>
+            ⬇ 全マスタCSV出力
+          </button>
+          <input ref={csvFileRef} type="file" accept=".csv,text/csv" hidden onChange={(e) => handleCsvFile(e.target.files?.[0] || null)} />
+        </div>
+      </div>
+      <div style={{ fontSize: 11, color: 'var(--slate-400)', marginBottom: 16 }}>
+        CSV出力は全カテゴリを1つのファイルにまとめます（カテゴリキー・カテゴリ名・登録名称の3列）。取込時は同じ形式のCSVで全カテゴリを一括上書きします。
       </div>
 
       <div className="subtabbar">

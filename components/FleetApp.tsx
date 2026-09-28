@@ -108,6 +108,9 @@ export default function FleetApp() {
   async function saveMasterCategory(category: keyof Masters, items: string[]) {
     return withSync(() => jsonFetch('/api/masters', { method: 'POST', body: JSON.stringify({ category, items }) }));
   }
+  async function saveAllMasters(masters: Masters) {
+    return withSync(() => jsonFetch('/api/masters/all', { method: 'POST', body: JSON.stringify(masters) }));
+  }
 
   async function handleAdminLogin(password: string) {
     try {
@@ -199,6 +202,7 @@ export default function FleetApp() {
             isAdmin={isAdmin}
             adminConfigured={adminConfigured}
             onSaveCategory={saveMasterCategory}
+            onSaveAll={saveAllMasters}
             onRequestLogin={() => setShowAdminLogin(true)}
           />
         )}
