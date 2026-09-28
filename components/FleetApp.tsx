@@ -9,9 +9,10 @@ import ReportsTab from './ReportsTab';
 import VehiclesTab from './VehiclesTab';
 import DriversTab from './DriversTab';
 import MastersTab from './MastersTab';
+import LogsTab from './LogsTab';
 import AdminLoginModal from './AdminLoginModal';
 
-type Tab = 'reports' | 'vehicles' | 'drivers' | 'masters';
+type Tab = 'reports' | 'vehicles' | 'drivers' | 'masters' | 'logs';
 type SyncStatus = 'idle' | 'saving' | 'error';
 
 async function jsonFetch(url: string, init?: RequestInit) {
@@ -141,6 +142,14 @@ export default function FleetApp() {
       throw e;
     }
   }
+  async function clearLogs() {
+    try {
+      return await withSync(() => jsonFetch('/api/logs', { method: 'DELETE' }));
+    } catch (e) {
+      handleAdminApiError(e);
+      throw e;
+    }
+  }
 
   async function handleAdminLogin(password: string) {
     try {
@@ -237,6 +246,15 @@ export default function FleetApp() {
             onSaveCategory={saveMasterCategory}
             onSaveAll={saveAllMasters}
             onRequestLogin={() => setShowAdminLogin(true)}
+          />
+        )}
+        {tab === 'logs' && (
+          <LogsTab
+            data={data}
+            isAdmin={isAdmin}
+            adminConfigured={adminConfigured}
+            onRequestLogin={() => setShowAdminLogin(true)}
+            onClearLogs={clearLogs}
           />
         )}
       </main>

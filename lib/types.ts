@@ -83,11 +83,21 @@ export const MASTER_LABELS: Record<MasterKey, string> = {
   licenseTypes: '免許種別',
 };
 
+export type LogEntry = {
+  id: string;
+  at: string;
+  actor: 'admin' | 'user';
+  action: string;
+  target: string;
+  detail?: string;
+};
+
 export type AppData = {
   reports: Report[];
   vehicles: Vehicle[];
   drivers: Driver[];
   masters: Masters;
+  logs: LogEntry[];
   persistent: boolean;
 };
 

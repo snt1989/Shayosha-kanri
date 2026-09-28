@@ -1,4 +1,4 @@
-import { Driver, MASTER_KEYS, MASTER_LABELS, MasterKey, Masters, Vehicle } from './types';
+import { Driver, LogEntry, MASTER_KEYS, MASTER_LABELS, MasterKey, Masters, Vehicle } from './types';
 import { genId } from './utils';
 
 function csvEscape(v: unknown): string {
@@ -153,8 +153,31 @@ export function csvToMasters(text: string): Masters {
   return result;
 }
 
+/* ---------- logs ---------- */
+const LOG_HEADERS = ['日時', '操作者', '操作内容', '対象', '詳細'];
+
+export function logsToCsv(logs: LogEntry[]): string {
+  const rows: (string | number)[][] = [LOG_HEADERS];
+  logs.forEach((l) => {
+    rows.push([l.at, l.actor === 'admin' ? '管理者' : '利用者', l.action, l.target, l.detail || '']);
+  });
+  return toCsv(rows);
+}
+
 export function downloadCsv(filename: string, csv: string) {
   const blob = new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+
+export function downloadJson(filename: string, data: unknown) {
+  const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json;charset=utf-8;' });
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
   a.href = url;

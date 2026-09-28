@@ -23,6 +23,7 @@ function defaultData(): Omit<AppData, 'persistent'> {
     vehicles: DEFAULT_VEHICLES,
     drivers: DEFAULT_DRIVERS,
     masters: DEFAULT_MASTERS,
+    logs: [],
   };
 }
 
@@ -68,6 +69,7 @@ async function readLocal(): Promise<Omit<AppData, 'persistent'>> {
       vehicles: parsed.vehicles ?? DEFAULT_VEHICLES,
       drivers: parsed.drivers ?? DEFAULT_DRIVERS,
       masters: mergeMasters(parsed.masters),
+      logs: parsed.logs ?? [],
     };
   } catch {
     const d = defaultData();
@@ -95,6 +97,7 @@ export async function loadData(): Promise<AppData> {
       vehicles: raw.vehicles ?? DEFAULT_VEHICLES,
       drivers: raw.drivers ?? DEFAULT_DRIVERS,
       masters: mergeMasters(raw.masters),
+      logs: raw.logs ?? [],
       persistent: true,
     };
   }
