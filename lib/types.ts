@@ -32,6 +32,7 @@ export type Report = {
   endKm: number;
   tripKm: number;
   notes: string;
+  inspectionPhoto?: string;
 };
 
 export type Vehicle = {

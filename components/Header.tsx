@@ -1,0 +1,85 @@
+'use client';
+
+type Tab = 'reports' | 'vehicles' | 'drivers' | 'masters';
+type SyncStatus = 'idle' | 'saving' | 'error';
+
+const TABS: { key: Tab; label: string; icon: string; admin?: boolean }[] = [
+  { key: 'reports', label: '運転日報・点呼記録', icon: '📝' },
+  { key: 'vehicles', label: '社用車台帳・車検', icon: '🚗' },
+  { key: 'drivers', label: '運転者台帳・免許', icon: '🪪' },
+  { key: 'masters', label: '各種マスタ設定', icon: '⚙️', admin: true },
+];
+
+export default function Header({
+  tab,
+  onTabChange,
+  syncStatus,
+  isAdmin,
+  onOpenAdminLogin,
+  onLogoutAdmin,
+  onQuickReport,
+}: {
+  tab: Tab;
+  onTabChange: (t: Tab) => void;
+  syncStatus: SyncStatus;
+  isAdmin: boolean;
+  onOpenAdminLogin: () => void;
+  onLogoutAdmin: () => void;
+  onQuickReport: () => void;
+}) {
+  const syncLabel = syncStatus === 'saving' ? '同期中…' : syncStatus === 'error' ? '同期エラー' : '同期完了';
+  const syncCls = syncStatus === 'saving' ? 'saving' : syncStatus === 'error' ? 'error' : 'ok';
+
+  return (
+    <header className="appbar2">
+      <div className="appbar2-row">
+        <div className="brand2">
+          <div className="logo2">🚙</div>
+          <div className="titles2">
+            <h1>
+              社用車管理クラウド
+              <span className="badge2">白ナンバー法令対応</span>
+            </h1>
+            <div className="sub2">運転日報・点呼記録・車両台帳・運転者台帳・各種マスタ一括管理</div>
+          </div>
+        </div>
+
+        <nav className="tabs2">
+          {TABS.map((t) => (
+            <button
+              key={t.key}
+              className={`tab2 ${tab === t.key ? 'active' : ''}`}
+              onClick={() => onTabChange(t.key)}
+            >
+              <span>{t.icon}</span>
+              {t.label}
+              {t.admin && <span className="adminbadge">ADMIN</span>}
+            </button>
+          ))}
+        </nav>
+
+        <div className="headerbtns">
+          <span className={`sync-chip ${syncCls}`}>
+            <span className="dot" />
+            {syncLabel}
+          </span>
+          {isAdmin ? (
+            <button className="btn btn-sm" onClick={onLogoutAdmin}>
+              🔓 管理者ログアウト
+            </button>
+          ) : (
+            <button className="btn btn-sm" onClick={onOpenAdminLogin}>
+              🔒 管理者ログイン
+            </button>
+          )}
+        </div>
+      </div>
+
+      <div className="quickbar" style={{ marginTop: 10 }}>
+        <button className="btn btn-primary btn-sm" onClick={onQuickReport}>
+          ＋ 出発登録（運転前）
+        </button>
+      </div>
+    </header>
+  );
+}

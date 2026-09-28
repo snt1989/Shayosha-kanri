@@ -1,77 +1,242 @@
 'use client';
 
 import { useState } from 'react';
-import { MASTER_KEYS, MASTER_LABELS, Masters } from '@/lib/types';
+import { MASTER_KEYS, MASTER_LABELS, MasterKey, Masters } from '@/lib/types';
+
+const ICONS: Record<MasterKey, string> = {
+  departments: '🏢',
+  checkers: '👤',
+  checkMethods: '📞',
+  maintTypes: '🔧',
+  tireTypes: '🛞',
+  licenseTypes: '🪪',
+};
 
 export default function MastersTab({
   masters,
+  isAdmin,
+  adminConfigured,
   onSaveCategory,
+  onRequestLogin,
 }: {
   masters: Masters;
-  onSaveCategory: (category: keyof Masters, items: string[]) => Promise<void>;
+  isAdmin: boolean;
+  adminConfigured: boolean;
+  onSaveCategory: (category: MasterKey, items: string[]) => Promise<unknown>;
+  onRequestLogin: () => void;
 }) {
-  const [drafts, setDrafts] = useState<Record<string, string>>({});
-  const [savingCat, setSavingCat] = useState<string | null>(null);
+  const [activeCat, setActiveCat] = useState<MasterKey>('departments');
+  const [bulkText, setBulkText] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [editIdx, setEditIdx] = useState<number | null>(null);
+  const [editVal, setEditVal] = useState('');
 
-  async function addItem(cat: keyof Masters) {
-    const val = (drafts[cat] || '').trim();
-    if (!val) return;
-    if (masters[cat].includes(val)) {
-      setDrafts({ ...drafts, [cat]: '' });
-      return;
-    }
-    setSavingCat(cat);
+  if (!isAdmin) {
+    return (
+      <div className="card">
+        <div className="locked-panel">
+          <div className="lock-ic">🔒</div>
+          <h3>管理者ログインが必要です</h3>
+          <p>
+            各種マスタ（事業部・確認者・確認方法・整備区分・タイヤ種別・免許種別）の編集は、
+            誤操作防止のため管理者のみ行えます。
+          </p>
+          <button className="btn btn-primary" onClick={onRequestLogin}>
+            🔒 管理者ログイン
+          </button>
+          {!adminConfigured && (
+            <p style={{ marginTop: 14, color: 'var(--amber-600)' }}>
+              ※ サーバーに ADMIN_PASSWORD が未設定です。Vercelの環境変数を設定してください。
+            </p>
+          )}
+        </div>
+      </div>
+    );
+  }
+
+  const items = masters[activeCat];
+
+  async function persist(list: string[]) {
+    setBusy(true);
     try {
-      await onSaveCategory(cat, [...masters[cat], val]);
-      setDrafts({ ...drafts, [cat]: '' });
+      await onSaveCategory(activeCat, list);
     } finally {
-      setSavingCat(null);
+      setBusy(false);
     }
   }
 
-  async function removeItem(cat: keyof Masters, val: string) {
-    setSavingCat(cat);
-    try {
-      await onSaveCategory(
-        cat,
-        masters[cat].filter((v) => v !== val)
-      );
-    } finally {
-      setSavingCat(null);
-    }
+  async function bulkAdd() {
+    const lines = bulkText
+      .split('\n')
+      .map((s) => s.trim())
+      .filter(Boolean);
+    if (lines.length === 0) return;
+    const merged = [...items];
+    lines.forEach((line) => {
+      if (!merged.includes(line)) merged.push(line);
+    });
+    await persist(merged);
+    setBulkText('');
+  }
+
+  async function removeAt(idx: number) {
+    const list = [...items];
+    list.splice(idx, 1);
+    await persist(list);
+  }
+
+  async function move(idx: number, dir: -1 | 1) {
+    const target = idx + dir;
+    if (target < 0 || target >= items.length) return;
+    const list = [...items];
+    [list[idx], list[target]] = [list[target], list[idx]];
+    await persist(list);
+  }
+
+  async function sortAlpha() {
+    const list = [...items].sort((a, b) => a.localeCompare(b, 'ja'));
+    await persist(list);
+  }
+
+  function startEdit(idx: number) {
+    setEditIdx(idx);
+    setEditVal(items[idx]);
+  }
+
+  async function saveEdit() {
+    if (editIdx === null) return;
+    const val = editVal.trim();
+    if (!val) return;
+    const list = [...items];
+    list[editIdx] = val;
+    await persist(list);
+    setEditIdx(null);
   }
 
   return (
-    <div className="masters-grid">
-      {MASTER_KEYS.map((cat) => (
-        <div className="card" key={cat}>
-          <h3 className="card-title">{MASTER_LABELS[cat]}</h3>
-          <div className="master-chip-list">
-            {masters[cat].length === 0 && <span className="empty-state">未登録</span>}
-            {masters[cat].map((v) => (
-              <span className="master-chip" key={v}>
-                {v}
-                <button onClick={() => removeItem(cat, v)} disabled={savingCat === cat} aria-label="削除">
-                  ×
-                </button>
-              </span>
-            ))}
+    <div className="card">
+      <h3 className="card-title" style={{ marginBottom: 4 }}>
+        ⚙️ 各種プルダウン・マスタ一括管理
+      </h3>
+      <div style={{ fontSize: 12, color: 'var(--slate-500)', marginBottom: 16 }}>
+        事業部、点呼確認者、確認方法、点検区分などの選択肢を自由に設定・編集できます。
+      </div>
+
+      <div className="subtabbar">
+        {MASTER_KEYS.map((k) => (
+          <button
+            key={k}
+            className={`subtab ${activeCat === k ? 'active' : ''}`}
+            onClick={() => {
+              setActiveCat(k);
+              setEditIdx(null);
+              setBulkText('');
+            }}
+          >
+            <span>{ICONS[k]}</span>
+            {MASTER_LABELS[k]}
+          </button>
+        ))}
+      </div>
+
+      <div className="masters-layout">
+        <div className="bulk-paste">
+          <div className="section-heading" style={{ marginTop: 0 }}>
+            まとめて一括登録（Excelコピペ可）
           </div>
-          <div className="add-row">
-            <input
-              placeholder="新しい項目を追加"
-              value={drafts[cat] || ''}
-              onChange={(e) => setDrafts({ ...drafts, [cat]: e.target.value })}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter') addItem(cat);
-              }}
-            />
-            <button className="btn btn-sm btn-primary" onClick={() => addItem(cat)} disabled={savingCat === cat}>
-              追加
+          <p style={{ fontSize: 11.5, color: 'var(--slate-500)', marginTop: -4, marginBottom: 8 }}>
+            Excelの列からコピーして貼り付けてください（改行区切り）。
+          </p>
+          <textarea
+            placeholder="改行区切りで貼り付け…"
+            value={bulkText}
+            onChange={(e) => setBulkText(e.target.value)}
+            spellCheck={false}
+          />
+          <button className="btn btn-primary btn-block" style={{ marginTop: 10, background: 'var(--green-600)', borderColor: 'var(--green-600)' }} onClick={bulkAdd} disabled={busy || !bulkText.trim()}>
+            一括追加して保存
+          </button>
+        </div>
+
+        <div>
+          <div className="toolbar2" style={{ marginBottom: 10 }}>
+            <div style={{ fontWeight: 700, fontSize: 13 }}>登録済み一覧</div>
+            <button className="btn btn-sm" onClick={sortAlpha} disabled={busy || items.length < 2}>
+              🔤 五十音順に整列
             </button>
           </div>
+          {items.length === 0 ? (
+            <div className="empty-state">未登録です</div>
+          ) : (
+            <div className="table-wrap">
+              <table className="data-table reorder-table">
+                <thead>
+                  <tr>
+                    <th>No.</th>
+                    <th>登録名称</th>
+                    <th>並び順</th>
+                    <th>操作</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {items.map((v, idx) => (
+                    <tr key={idx}>
+                      <td>{idx + 1}</td>
+                      <td className="name-cell">
+                        {editIdx === idx ? (
+                          <input
+                            value={editVal}
+                            autoFocus
+                            onChange={(e) => setEditVal(e.target.value)}
+                            onKeyDown={(e) => {
+                              if (e.key === 'Enter') saveEdit();
+                              if (e.key === 'Escape') setEditIdx(null);
+                            }}
+                            style={{ padding: '5px 8px', border: '1px solid var(--slate-300)', borderRadius: 6, fontSize: 12.5 }}
+                          />
+                        ) : (
+                          v
+                        )}
+                      </td>
+                      <td>
+                        <span className="reorder-btns">
+                          <button onClick={() => move(idx, -1)} disabled={idx === 0 || busy}>
+                            ↑
+                          </button>
+                          <button onClick={() => move(idx, 1)} disabled={idx === items.length - 1 || busy}>
+                            ↓
+                          </button>
+                        </span>
+                      </td>
+                      <td>
+                        {editIdx === idx ? (
+                          <>
+                            <button className="btn btn-sm btn-primary" onClick={saveEdit}>
+                              保存
+                            </button>{' '}
+                            <button className="btn btn-sm" onClick={() => setEditIdx(null)}>
+                              キャンセル
+                            </button>
+                          </>
+                        ) : (
+                          <>
+                            <button className="btn btn-sm" onClick={() => startEdit(idx)}>
+                              変更
+                            </button>{' '}
+                            <button className="btn btn-sm btn-danger" onClick={() => removeAt(idx)} disabled={busy}>
+                              削除
+                            </button>
+                          </>
+                        )}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
         </div>
-      ))}
+      </div>
     </div>
   );
 }

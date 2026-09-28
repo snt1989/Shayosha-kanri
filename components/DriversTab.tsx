@@ -1,9 +1,11 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import { AppData, Driver } from '@/lib/types';
-import { daysUntil } from '@/lib/utils';
+import { daysUntil, todayStr } from '@/lib/utils';
+import { csvToDrivers, downloadCsv, driversToCsv } from '@/lib/csv';
 import Modal from './Modal';
+import DriverOcrModal from './DriverOcrModal';
 
 const emptyDriver = (data: AppData): Driver => ({
   id: '',
@@ -22,14 +24,18 @@ export default function DriversTab({
   data,
   onSave,
   onDelete,
+  onBulkSave,
 }: {
   data: AppData;
-  onSave: (d: Driver) => Promise<void>;
-  onDelete: (id: string) => Promise<void>;
+  onSave: (d: Driver) => Promise<unknown>;
+  onDelete: (id: string) => Promise<unknown>;
+  onBulkSave: (list: Driver[]) => Promise<unknown>;
 }) {
   const [query, setQuery] = useState('');
   const [editing, setEditing] = useState<Driver | null>(null);
   const [saving, setSaving] = useState(false);
+  const [showOcr, setShowOcr] = useState(false);
+  const fileRef = useRef<HTMLInputElement>(null);
 
   const filtered = useMemo(() => {
     const q = query.trim();
@@ -42,7 +48,6 @@ export default function DriversTab({
   function openNew() {
     setEditing(emptyDriver(data));
   }
-
   function openEdit(d: Driver) {
     setEditing({ ...d });
   }
@@ -75,61 +80,104 @@ export default function DriversTab({
     return <span className="pill pill-green">正常</span>;
   }
 
+  function triggerCsvImport() {
+    fileRef.current?.click();
+  }
+
+  function handleCsvFile(file: File | null) {
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = async () => {
+      const text = String(reader.result || '');
+      const imported = csvToDrivers(text);
+      const byId = new Map(data.drivers.map((d) => [d.id, d]));
+      imported.forEach((d) => byId.set(d.id, d));
+      if (!confirm(`${imported.length}件の運転者データを取り込みます。よろしいですか？`)) return;
+      await onBulkSave(Array.from(byId.values()));
+    };
+    reader.readAsText(file, 'utf-8');
+    if (fileRef.current) fileRef.current.value = '';
+  }
+
+  function exportCsv() {
+    downloadCsv(`運転者台帳_${todayStr()}.csv`, driversToCsv(data.drivers).replace(/^﻿/, ''));
+  }
+
   return (
     <div>
-      <div className="toolbar">
-        <input
-          className="search"
-          placeholder="氏名・社員番号・部署で検索"
-          value={query}
-          onChange={(e) => setQuery(e.target.value)}
-          style={{ padding: '9px 12px', border: '1px solid var(--slate-300)', borderRadius: 8 }}
-        />
-        <button className="btn btn-primary" onClick={openNew}>
-          ＋ 運転者を新規登録
-        </button>
-      </div>
-
       <div className="card">
+        <div className="toolbar2">
+          <div>
+            <h3 className="card-title" style={{ marginBottom: 4 }}>
+              🪪 運転者 台帳管理 <span className="pill pill-slate">本人セルフ登録・免許OCR対応</span>
+            </h3>
+            <div style={{ fontSize: 12, color: 'var(--slate-500)' }}>
+              運転者の登録・免許証有効期限アラート（60日以内）・所属部署管理
+            </div>
+          </div>
+          <div className="actions">
+            <input
+              className="search"
+              placeholder="氏名・社員番号・部署で検索"
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              style={{ padding: '9px 12px', border: '1px solid var(--slate-300)', borderRadius: 8, minWidth: 180 }}
+            />
+            <button className="btn btn-sm" style={{ background: 'var(--green-50)', borderColor: 'var(--green-100)', color: 'var(--green-600)' }} onClick={() => setShowOcr(true)}>
+              📷 免許証写真で自動登録（本人登録）
+            </button>
+            <button className="btn btn-sm" onClick={openNew}>
+              手入力で登録
+            </button>
+            <button className="btn btn-sm" onClick={triggerCsvImport}>
+              ⬆ 運転者CSV取込
+            </button>
+            <button className="btn btn-sm" onClick={exportCsv}>
+              ⬇ 運転者CSV出力
+            </button>
+            <input ref={fileRef} type="file" accept=".csv,text/csv" hidden onChange={(e) => handleCsvFile(e.target.files?.[0] || null)} />
+          </div>
+        </div>
+
         {filtered.length === 0 ? (
           <div className="empty-state">運転者データがありません</div>
         ) : (
-          <div className="table-wrap">
-            <table className="data-table">
-              <thead>
-                <tr>
-                  <th>氏名</th>
-                  <th>社員番号</th>
-                  <th>所属</th>
-                  <th>免許種別</th>
-                  <th>免許更新期日</th>
-                  <th>状態</th>
-                  <th></th>
-                </tr>
-              </thead>
-              <tbody>
-                {filtered.map((d) => (
-                  <tr key={d.id}>
-                    <td>
+          <div className="cardgrid">
+            {filtered.map((d) => (
+              <div className="entity-card" key={d.id}>
+                <div className="ehead">
+                  <div>
+                    <div className="ename">
                       {d.lastName} {d.firstName}
-                    </td>
-                    <td>{d.empId || '-'}</td>
-                    <td>{d.dept}</td>
-                    <td>{d.licenseType}</td>
-                    <td>{d.licenseExpiry || '-'}</td>
-                    <td>{licenseBadge(d)}</td>
-                    <td>
-                      <button className="btn btn-sm" onClick={() => openEdit(d)}>
-                        編集
-                      </button>{' '}
-                      <button className="btn btn-sm btn-danger" onClick={() => handleDelete(d.id)}>
-                        削除
-                      </button>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+                    </div>
+                    <div className="esub">
+                      {d.dept} {d.empId && `(${d.empId})`}
+                    </div>
+                  </div>
+                  <span className="pill pill-slate">{d.licenseType}</span>
+                </div>
+                <div className="emeta" style={{ gridTemplateColumns: '1fr' }}>
+                  <div>
+                    <span className="k">免許更新期限:</span> <span className="v">{d.licenseExpiry || '-'}</span> {licenseBadge(d)}
+                  </div>
+                  <div>
+                    <span className="k">連絡先:</span> <span className="v">{d.phone || '-'}</span>
+                  </div>
+                  <div>
+                    <span className="k">免許証番号:</span> <span className="v">{d.licenseNo || '-'}</span>
+                  </div>
+                </div>
+                <div className="efoot">
+                  <button className="btn btn-sm" onClick={() => openEdit(d)}>
+                    編集
+                  </button>
+                  <span className="eid">{d.id}</span>
+                  <button className="btn btn-sm btn-danger" onClick={() => handleDelete(d.id)}>
+                    削除
+                  </button>
+                </div>
+              </div>
+            ))}
           </div>
         )}
       </div>
@@ -152,17 +200,11 @@ export default function DriversTab({
           <div className="field-row">
             <div className="field">
               <label>氏名（姓）</label>
-              <input
-                value={editing.lastName}
-                onChange={(e) => setEditing({ ...editing, lastName: e.target.value })}
-              />
+              <input value={editing.lastName} onChange={(e) => setEditing({ ...editing, lastName: e.target.value })} />
             </div>
             <div className="field">
               <label>氏名（名）</label>
-              <input
-                value={editing.firstName}
-                onChange={(e) => setEditing({ ...editing, firstName: e.target.value })}
-              />
+              <input value={editing.firstName} onChange={(e) => setEditing({ ...editing, firstName: e.target.value })} />
             </div>
           </div>
           <div className="field-row">
@@ -184,10 +226,7 @@ export default function DriversTab({
           <div className="field-row">
             <div className="field">
               <label>免許種別</label>
-              <select
-                value={editing.licenseType}
-                onChange={(e) => setEditing({ ...editing, licenseType: e.target.value })}
-              >
+              <select value={editing.licenseType} onChange={(e) => setEditing({ ...editing, licenseType: e.target.value })}>
                 {data.masters.licenseTypes.map((t) => (
                   <option key={t} value={t}>
                     {t}
@@ -197,11 +236,7 @@ export default function DriversTab({
             </div>
             <div className="field">
               <label>免許更新期日</label>
-              <input
-                type="date"
-                value={editing.licenseExpiry}
-                onChange={(e) => setEditing({ ...editing, licenseExpiry: e.target.value })}
-              />
+              <input type="date" value={editing.licenseExpiry} onChange={(e) => setEditing({ ...editing, licenseExpiry: e.target.value })} />
             </div>
           </div>
           <div className="field-row">
@@ -211,22 +246,17 @@ export default function DriversTab({
             </div>
             <div className="field">
               <label>免許証番号</label>
-              <input
-                value={editing.licenseNo}
-                onChange={(e) => setEditing({ ...editing, licenseNo: e.target.value })}
-              />
+              <input value={editing.licenseNo} onChange={(e) => setEditing({ ...editing, licenseNo: e.target.value })} />
             </div>
           </div>
           <div className="field">
             <label>特記事項</label>
-            <textarea
-              rows={2}
-              value={editing.notes}
-              onChange={(e) => setEditing({ ...editing, notes: e.target.value })}
-            />
+            <textarea rows={2} value={editing.notes} onChange={(e) => setEditing({ ...editing, notes: e.target.value })} />
           </div>
         </Modal>
       )}
+
+      {showOcr && <DriverOcrModal data={data} onClose={() => setShowOcr(false)} onSave={onSave} />}
     </div>
   );
 }
