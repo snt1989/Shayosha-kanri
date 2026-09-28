@@ -114,11 +114,27 @@ export default function ReportsTab({
     );
   }, [data.reports, query]);
 
+  const reportCodes = useMemo(() => {
+    const sorted = [...data.reports].sort((a, b) => (a.date + a.preTime).localeCompare(b.date + b.preTime));
+    const map = new Map<string, string>();
+    sorted.forEach((r, idx) => map.set(r.id, `R-${101 + idx}`));
+    return map;
+  }, [data.reports]);
+
   function openNew() {
     setEditing(emptyReport(data));
   }
   function openEdit(r: Report) {
     setEditing({ ...r });
+  }
+  function openReturnCheckin(r: Report) {
+    setEditing({
+      ...r,
+      postDone: true,
+      postTime: r.postTime || nowTimeStr(),
+      postChecker: r.postChecker || data.masters.checkers[0] || '',
+      postMethod: r.postMethod || data.masters.checkMethods[0] || '',
+    });
   }
 
   function selectDriver(id: string) {
@@ -242,16 +258,25 @@ export default function ReportsTab({
               <tbody>
                 {filtered.map((r) => (
                   <tr key={r.id}>
-                    <td>{r.date}</td>
-                    <td>{r.driver}</td>
-                    <td>{r.vehicleName}</td>
+                    <td>
+                      {r.date}
+                      <span className="cell-sub">{reportCodes.get(r.id)}</span>
+                    </td>
+                    <td>
+                      {r.driver}
+                      {r.dept && <span className="pill pill-slate cell-sub-pill">{r.dept}</span>}
+                    </td>
+                    <td>
+                      {r.vehicleName}
+                      {r.plate && <span className="cell-sub">{r.plate}</span>}
+                    </td>
                     <td>
                       {r.destination}
-                      {r.purpose ? ` / ${r.purpose}` : ''}
+                      {r.purpose && <span className="cell-sub">{r.purpose}</span>}
                     </td>
                     <td>
                       {r.alcoholSkipped ? (
-                        <span className="pill pill-slate">免除</span>
+                        <span className="pill pill-slate">パス（免除）</span>
                       ) : parseFloat(r.preAlcohol || '0') > 0 ? (
                         <span className="pill pill-red">{r.preAlcohol}mg/L</span>
                       ) : (
@@ -260,7 +285,9 @@ export default function ReportsTab({
                     </td>
                     <td>
                       {!r.postDone ? (
-                        <span className="pill pill-slate">未実施</span>
+                        <button className="btn btn-sm" style={{ background: 'var(--amber-50, #fffbeb)', borderColor: 'var(--amber-100, #fde68a)', color: 'var(--amber-600)' }} onClick={() => openReturnCheckin(r)}>
+                          帰着登録する
+                        </button>
                       ) : parseFloat(r.postAlcohol || '0') > 0 ? (
                         <span className="pill pill-red">{r.postAlcohol}mg/L</span>
                       ) : (

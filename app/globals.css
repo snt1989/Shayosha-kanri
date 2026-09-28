@@ -359,6 +359,21 @@ table.data-table {
   background: var(--slate-50);
 }
 
+.cell-sub {
+  display: block;
+  font-size: 10.5px;
+  color: var(--slate-400);
+  margin-top: 2px;
+  font-weight: 500;
+}
+
+.cell-sub-pill {
+  display: inline-block;
+  margin-top: 4px;
+  font-size: 10px;
+  padding: 1px 7px;
+}
+
 .pill {
   display: inline-block;
   padding: 2px 9px;
