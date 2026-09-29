@@ -83,6 +83,7 @@ export default function ReportsTab({
   onDelete,
   onSaveDriver,
   openTrigger,
+  returnCheckinRequest,
   isAdmin,
   onRequestLogin,
 }: {
@@ -91,6 +92,7 @@ export default function ReportsTab({
   onDelete: (id: string) => Promise<unknown>;
   onSaveDriver: (d: Driver) => Promise<unknown>;
   openTrigger?: number;
+  returnCheckinRequest?: { id: string; token: number } | null;
   isAdmin: boolean;
   onRequestLogin: () => void;
 }) {
@@ -101,6 +103,7 @@ export default function ReportsTab({
   const [savingDriver, setSavingDriver] = useState(false);
   const photoInputRef = useRef<HTMLInputElement>(null);
   const lastTrigger = useRef(openTrigger);
+  const lastReturnCheckinToken = useRef(returnCheckinRequest?.token);
 
   useEffect(() => {
     if (openTrigger !== undefined && openTrigger !== lastTrigger.current) {
@@ -109,6 +112,15 @@ export default function ReportsTab({
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [openTrigger]);
+
+  useEffect(() => {
+    if (returnCheckinRequest && returnCheckinRequest.token !== lastReturnCheckinToken.current) {
+      lastReturnCheckinToken.current = returnCheckinRequest.token;
+      const r = data.reports.find((x) => x.id === returnCheckinRequest.id);
+      if (r) openReturnCheckin(r);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [returnCheckinRequest]);
 
   const filtered = useMemo(() => {
     const q = query.trim();
