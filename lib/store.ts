@@ -20,9 +20,11 @@ function hasUpstash() {
 function defaultData(): Omit<AppData, 'persistent'> {
   return {
     reports: [],
-    vehicles: DEFAULT_VEHICLES,
-    drivers: DEFAULT_DRIVERS,
-    masters: DEFAULT_MASTERS,
+    // モジュール定数への参照をそのまま返すと、呼び出し側の push 等でこの
+    // プロセスの「デフォルトデータ」自体が汚染されてしまうため、必ずコピーを返す。
+    vehicles: DEFAULT_VEHICLES.map((v) => ({ ...v, maintHistory: [...v.maintHistory] })),
+    drivers: DEFAULT_DRIVERS.map((d) => ({ ...d })),
+    masters: mergeMasters(DEFAULT_MASTERS),
     logs: [],
   };
 }
@@ -66,8 +68,8 @@ async function readLocal(): Promise<Omit<AppData, 'persistent'>> {
     const parsed = JSON.parse(raw);
     return {
       reports: parsed.reports ?? [],
-      vehicles: parsed.vehicles ?? DEFAULT_VEHICLES,
-      drivers: parsed.drivers ?? DEFAULT_DRIVERS,
+      vehicles: parsed.vehicles ?? DEFAULT_VEHICLES.map((v) => ({ ...v, maintHistory: [...v.maintHistory] })),
+      drivers: parsed.drivers ?? DEFAULT_DRIVERS.map((d) => ({ ...d })),
       masters: mergeMasters(parsed.masters),
       logs: parsed.logs ?? [],
     };
@@ -94,8 +96,8 @@ export async function loadData(): Promise<AppData> {
     }
     return {
       reports: raw.reports ?? [],
-      vehicles: raw.vehicles ?? DEFAULT_VEHICLES,
-      drivers: raw.drivers ?? DEFAULT_DRIVERS,
+      vehicles: raw.vehicles ?? DEFAULT_VEHICLES.map((v) => ({ ...v, maintHistory: [...v.maintHistory] })),
+      drivers: raw.drivers ?? DEFAULT_DRIVERS.map((d) => ({ ...d })),
       masters: mergeMasters(raw.masters),
       logs: raw.logs ?? [],
       persistent: true,

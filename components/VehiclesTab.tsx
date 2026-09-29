@@ -145,10 +145,16 @@ export default function VehiclesTab({
 
   async function saveBulkEdit() {
     if (bulkRows === null) return;
-    if (bulkRows.some((v) => !v.name.trim() || !v.plate.trim() || !v.shakenDate)) {
-      alert('車両呼称・ナンバープレート・車検満了日は全行で必須です。');
+    if (bulkRows.some((v) => !v.name.trim() || !v.plate.trim())) {
+      alert('車両呼称・ナンバープレートは全行で必須です。');
       return;
     }
+    const removedCount = data.vehicles.length - bulkRows.filter((v) => v.id).length;
+    const confirmMsg =
+      removedCount > 0
+        ? `${bulkRows.length}件を保存します（${removedCount}件の車両が削除されます）。よろしいですか？`
+        : `${bulkRows.length}件を保存します。よろしいですか？`;
+    if (!confirm(confirmMsg)) return;
     setBulkSaving(true);
     try {
       await onBulkSave(bulkRows);
