@@ -60,6 +60,19 @@ export default function FleetApp() {
     }
   }
 
+  // 保存後にサーバーの最新データへ静かに同期するための再取得。
+  // load() と違って画面全体を「読み込み中…」に差し替えず、タブや各画面の
+  // 入力途中の状態を保ったままデータだけを更新する。
+  async function refreshData() {
+    try {
+      const d = await jsonFetch('/api/data');
+      setData(d);
+    } catch {
+      // 表示中のデータはそのまま維持し、同期エラー表示のみ行う
+      setSyncStatus('error');
+    }
+  }
+
   async function checkAdminSession() {
     try {
       const res = await jsonFetch('/api/admin/session');
@@ -74,7 +87,7 @@ export default function FleetApp() {
     setSyncStatus('saving');
     try {
       const result = await fn();
-      await load();
+      await refreshData();
       setSyncStatus('idle');
       return result;
     } catch (e) {
