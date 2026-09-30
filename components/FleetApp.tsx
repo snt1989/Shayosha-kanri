@@ -37,7 +37,7 @@ export default function FleetApp() {
   const [isAdmin, setIsAdmin] = useState(false);
   const [adminConfigured, setAdminConfigured] = useState(true);
   const [showAdminLogin, setShowAdminLogin] = useState(false);
-  const [quickReportTrigger, setQuickReportTrigger] = useState(0);
+  const [quickReportTrigger, setQuickReportTrigger] = useState<number | null>(null);
   const [returnCheckinRequest, setReturnCheckinRequest] = useState<{ id: string; token: number } | null>(null);
 
   useEffect(() => {
@@ -186,12 +186,18 @@ export default function FleetApp() {
 
   function handleQuickReport() {
     setTab('reports');
-    setQuickReportTrigger((n) => n + 1);
+    setQuickReportTrigger(Date.now());
+  }
+  function handleQuickReportHandled() {
+    setQuickReportTrigger(null);
   }
 
   function handleReturnCheckin(id: string) {
     setTab('reports');
-    setReturnCheckinRequest((cur) => ({ id, token: (cur?.token || 0) + 1 }));
+    setReturnCheckinRequest({ id, token: Date.now() });
+  }
+  function handleReturnCheckinHandled() {
+    setReturnCheckinRequest(null);
   }
 
   if (loading) {
@@ -244,7 +250,9 @@ export default function FleetApp() {
             onDelete={deleteReport}
             onSaveDriver={saveDriver}
             openTrigger={quickReportTrigger}
+            onQuickReportHandled={handleQuickReportHandled}
             returnCheckinRequest={returnCheckinRequest}
+            onReturnCheckinHandled={handleReturnCheckinHandled}
             isAdmin={isAdmin}
             onRequestLogin={() => setShowAdminLogin(true)}
           />

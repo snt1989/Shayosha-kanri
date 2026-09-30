@@ -83,7 +83,9 @@ export default function ReportsTab({
   onDelete,
   onSaveDriver,
   openTrigger,
+  onQuickReportHandled,
   returnCheckinRequest,
+  onReturnCheckinHandled,
   isAdmin,
   onRequestLogin,
 }: {
@@ -91,8 +93,10 @@ export default function ReportsTab({
   onSave: (r: Report) => Promise<unknown>;
   onDelete: (id: string) => Promise<unknown>;
   onSaveDriver: (d: Driver) => Promise<unknown>;
-  openTrigger?: number;
+  openTrigger?: number | null;
+  onQuickReportHandled?: () => void;
   returnCheckinRequest?: { id: string; token: number } | null;
+  onReturnCheckinHandled?: () => void;
   isAdmin: boolean;
   onRequestLogin: () => void;
 }) {
@@ -102,22 +106,25 @@ export default function ReportsTab({
   const [quickDriver, setQuickDriver] = useState<Driver | null>(null);
   const [savingDriver, setSavingDriver] = useState(false);
   const photoInputRef = useRef<HTMLInputElement>(null);
-  const lastTrigger = useRef(openTrigger);
-  const lastReturnCheckinToken = useRef(returnCheckinRequest?.token);
 
+  // openTrigger/returnCheckinRequest はタブ切替と同時に発火するため、このコンポーネント
+  // 自体が新規マウントされるケースがある（親のrefベースの前回値比較だと、マウント時に
+  // ref の初期値が最新のprops値と一致してしまい、初回クリックが無視される）。
+  // そのため「開いたら親に伝えてリクエストをクリアしてもらう」方式にして、値が
+  // 存在する限り毎回確実に開く。
   useEffect(() => {
-    if (openTrigger !== undefined && openTrigger !== lastTrigger.current) {
-      lastTrigger.current = openTrigger;
+    if (openTrigger != null) {
       setEditing(emptyReport(data));
+      onQuickReportHandled?.();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [openTrigger]);
 
   useEffect(() => {
-    if (returnCheckinRequest && returnCheckinRequest.token !== lastReturnCheckinToken.current) {
-      lastReturnCheckinToken.current = returnCheckinRequest.token;
+    if (returnCheckinRequest) {
       const r = data.reports.find((x) => x.id === returnCheckinRequest.id);
       if (r) openReturnCheckin(r);
+      onReturnCheckinHandled?.();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [returnCheckinRequest]);
