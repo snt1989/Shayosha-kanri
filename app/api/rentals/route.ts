@@ -33,12 +33,17 @@ export async function POST(req: NextRequest) {
   if (idx >= 0) r.createdAt = data.rentals[idx].createdAt || r.createdAt;
   if (idx >= 0) data.rentals[idx] = r;
   else data.rentals.push(r);
+  // 登録期間を変えたら、期間の外に出てしまった予約は取り消す
+  const last = r.returnedAt || r.endDate;
+  const before = data.reservations.length;
+  data.reservations = data.reservations.filter((x) => x.rentalId !== r.id || (x.startDate >= r.startDate && x.endDate <= last));
+  const cancelled = before - data.reservations.length;
 
   pushLog(data, {
     actor: isAdminReq ? 'admin' : 'user',
     action: isNew || idx < 0 ? 'レンタカー登録' : 'レンタカー更新',
     target: `${r.startDate} ${r.company} ${r.carModel || ''}`.trim(),
-    detail: r.plate || undefined,
+    detail: [r.plate, cancelled ? `期間外の予約${cancelled}件を取消` : ''].filter(Boolean).join(' / ') || undefined,
   });
 
   await saveData({
@@ -48,6 +53,7 @@ export async function POST(req: NextRequest) {
     masters: data.masters,
     logs: data.logs,
     rentals: data.rentals,
+    reservations: data.reservations,
   });
   return NextResponse.json({ success: true, id: r.id });
 }

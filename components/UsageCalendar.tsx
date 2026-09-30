@@ -82,7 +82,8 @@ export default function UsageCalendar({
   const colorOf = useMemo(() => {
     const map = new Map<string, { bg: string; fg: string }>();
     data.vehicles.forEach((v, i) => map.set(v.id, VEHICLE_COLORS[i % VEHICLE_COLORS.length]));
-    return (id: string) => map.get(id) || { bg: 'var(--slate-100)', fg: 'var(--slate-600)' };
+    // レンタカー（車両台帳にないid）の予約はレンタカーの色
+    return (id: string) => map.get(id) || RENTAL_COLOR;
   }, [data.vehicles]);
 
   const byDate = useMemo(() => {
@@ -97,7 +98,7 @@ export default function UsageCalendar({
       push(r.date, { kind: 'report', time: r.preTime || '', r });
     });
     (data.reservations || []).forEach((v) => {
-      if (vehicleId && v.vehicleId !== vehicleId) return;
+      if (vehicleId === RENTAL_FILTER ? !v.rentalId : vehicleId && v.vehicleId !== vehicleId) return;
       // 複数日の予約は、その期間の各日に表示する（長すぎる予約は62日まで）
       let d = v.startDate;
       for (let n = 0; d <= v.endDate && n < 62; n++) {
@@ -161,6 +162,21 @@ export default function UsageCalendar({
     if (!form) return;
     setForm({ ...form, startDate: value, endDate: !form.endDate || form.endDate < value ? value : form.endDate });
   }
+  // 予約できるレンタカー: 返却済みでなく、今日以降にまだ期間が残っているもの（変更中の予約のレンタカーは必ず含める）
+  const bookableRentals = (data.rentals || []).filter((n) => n.id === form?.rentalId || (!n.returnedAt && n.endDate >= today));
+  const formRental = form ? data.rentals.find((n) => n.id === form.vehicleId) || null : null;
+  // 車両を選び直したとき、レンタカーなら日付を登録期間の中に収める
+  function changeVehicle(id: string) {
+    if (!form) return;
+    const n = data.rentals.find((x) => x.id === id);
+    if (!n) return setForm({ ...form, vehicleId: id, rentalId: undefined });
+    const first = n.startDate;
+    const last = n.returnedAt || n.endDate;
+    const clamp = (d: string) => (d < first ? first : d > last ? last : d);
+    const sd = clamp(form.startDate);
+    const ed = clamp(form.endDate);
+    setForm({ ...form, vehicleId: id, rentalId: id, startDate: sd, endDate: ed < sd ? sd : ed });
+  }
   function openChangeReservation(v: Reservation) {
     if (!currentDriver) {
       onRequestDriverLogin();
@@ -170,7 +186,9 @@ export default function UsageCalendar({
   }
   async function submitReservation() {
     if (!form) return;
-    const v = data.vehicles.find((x) => x.id === form.vehicleId);
+    const rental = data.rentals.find((x) => x.id === form.vehicleId);
+    const veh = data.vehicles.find((x) => x.id === form.vehicleId);
+    const v = veh || (rental ? { id: rental.id, name: `🚗 ${rentalName(rental)}`, plate: rental.plate } : undefined);
     // 運転者は、新規ならログイン中の運転者、変更なら予約に入っている運転者
     const d = data.drivers.find((x) => x.id === form.driverId);
     if (!v) {
@@ -185,8 +203,16 @@ export default function UsageCalendar({
       alert('利用日を入力してください。');
       return;
     }
+    if (rental) {
+      const last = rental.returnedAt || rental.endDate;
+      if (form.startDate < rental.startDate || form.endDate > last) {
+        alert(`レンタカーは登録期間（${rental.startDate}〜${last}）の中でだけ予約できます。`);
+        return;
+      }
+    }
     const rec: Reservation = {
       ...form,
+      rentalId: rental ? rental.id : undefined,
       vehicleName: v.name,
       plate: v.plate,
       // 台帳から削除された運転者の予約は、予約に残っている名前をそのまま使う
@@ -458,18 +484,35 @@ export default function UsageCalendar({
         >
           <div className="field">
             <label>車両 *</label>
-            <select value={form.vehicleId} onChange={(e) => setForm({ ...form, vehicleId: e.target.value })}>
-              {data.vehicles.map((v) => (
-                <option key={v.id} value={v.id}>
-                  {v.name}（{v.plate}）
-                </option>
-              ))}
+            <select value={form.vehicleId} onChange={(e) => changeVehicle(e.target.value)}>
+              <optgroup label="社用車">
+                {data.vehicles.map((v) => (
+                  <option key={v.id} value={v.id}>
+                    {v.name}（{v.plate}）
+                  </option>
+                ))}
+              </optgroup>
+              {bookableRentals.length > 0 && (
+                <optgroup label="レンタカー（登録期間のみ予約できます）">
+                  {bookableRentals.map((n) => (
+                    <option key={n.id} value={n.id}>
+                      🚗 {rentalName(n)}
+                      {n.plate ? `（${n.plate}）` : ''} {md(n.startDate)}〜{md(n.returnedAt || n.endDate)}
+                    </option>
+                  ))}
+                </optgroup>
+              )}
             </select>
+            {formRental && (
+              <div style={{ fontSize: 12, color: 'var(--slate-500)', marginTop: 4 }}>
+                このレンタカーは {formRental.startDate}〜{formRental.returnedAt || formRental.endDate} の間だけ予約できます。
+              </div>
+            )}
           </div>
           <div className="field-row">
             <div className="field">
               <label>開始日 *</label>
-              <input type="date" value={form.startDate} onChange={(e) => setStartDate(e.target.value)} />
+              <input type="date" value={form.startDate} min={formRental?.startDate} max={formRental ? formRental.returnedAt || formRental.endDate : undefined} onChange={(e) => setStartDate(e.target.value)} />
             </div>
             <div className="field">
               <label>開始時刻</label>
@@ -479,7 +522,7 @@ export default function UsageCalendar({
           <div className="field-row">
             <div className="field">
               <label>終了日 *</label>
-              <input type="date" value={form.endDate} min={form.startDate} onChange={(e) => setForm({ ...form, endDate: e.target.value })} />
+              <input type="date" value={form.endDate} min={form.startDate} max={formRental ? formRental.returnedAt || formRental.endDate : undefined} onChange={(e) => setForm({ ...form, endDate: e.target.value })} />
             </div>
             <div className="field">
               <label>終了時刻</label>

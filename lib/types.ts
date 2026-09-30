@@ -112,7 +112,8 @@ export type LogEntry = {
 // 車両の予約（使用予定）。日報とは別に、事前に押さえる使用枠を持つ。
 export type Reservation = {
   id: string;
-  vehicleId: string;
+  vehicleId: string; // レンタカーの予約のときは、そのレンタカーのid（rentalId と同じ）
+  rentalId?: string; // レンタカーの予約のとき設定。予約できるのはレンタカーの登録期間のみ
   vehicleName: string;
   plate: string;
   driverId?: string;

@@ -18,11 +18,14 @@ export async function DELETE(req: NextRequest, { params }: { params: Promise<{ i
   data.rentals = data.rentals.filter((x) => x.id !== id);
   const removedTrips = data.rentalTrips.filter((x) => x.rentalId === id).length;
   data.rentalTrips = data.rentalTrips.filter((x) => x.rentalId !== id);
+  const removedRes = data.reservations.filter((x) => x.rentalId === id).length;
+  data.reservations = data.reservations.filter((x) => x.rentalId !== id);
+  const removed = [removedTrips ? `運行記録${removedTrips}件` : '', removedRes ? `予約${removedRes}件` : ''].filter(Boolean);
   pushLog(data, {
     actor: 'admin',
     action: 'レンタカー削除',
     target: `${target.startDate} ${target.company} ${target.carModel || ''}`.trim(),
-    detail: removedTrips ? `運行記録${removedTrips}件も削除` : undefined,
+    detail: removed.length ? `${removed.join('・')}も削除` : undefined,
   });
   await saveData({
     reports: data.reports,
@@ -32,6 +35,7 @@ export async function DELETE(req: NextRequest, { params }: { params: Promise<{ i
     logs: data.logs,
     rentals: data.rentals,
     rentalTrips: data.rentalTrips,
+    reservations: data.reservations,
   });
   return NextResponse.json({ success: true });
 }

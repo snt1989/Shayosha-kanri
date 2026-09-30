@@ -326,6 +326,14 @@ export default function RentalTab({
           <div style={{ fontSize: 13, color: 'var(--slate-600)', marginBottom: 10 }}>
             <b>{ret.rental.company}</b> {[ret.rental.carClass, ret.rental.carModel, ret.rental.plate].filter(Boolean).join(' / ')}　{ret.rental.startDate}〜{ret.rental.endDate}
           </div>
+          {(() => {
+            const n = data.reservations.filter((x) => x.rentalId === ret.rental.id && x.startDate > ret.date).length;
+            return n > 0 ? (
+              <div className="alert-item warn" style={{ marginBottom: 10 }}>
+                返却日より後の予約 {n}件 は、返却すると取り消されます。
+              </div>
+            ) : null;
+          })()}
           <div className="field-row">
             <div className="field">
               <label>返却日</label>

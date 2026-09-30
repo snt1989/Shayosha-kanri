@@ -15,6 +15,7 @@ async function persist(data: Awaited<ReturnType<typeof loadData>>) {
     masters: data.masters,
     logs: data.logs,
     rentals: data.rentals,
+    reservations: data.reservations,
   });
 }
 
@@ -38,12 +39,16 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
   r.returnedTime = time;
   r.returnedBy = by;
   r.returnedById = body.byId || undefined;
+  // 返却日より後の予約は、レンタカーがもう無いので取り消す
+  const before = data.reservations.length;
+  data.reservations = data.reservations.filter((x) => x.rentalId !== r.id || x.startDate <= date);
+  const cancelled = before - data.reservations.length;
 
   pushLog(data, {
     actor: isAdminCookieValid(req.cookies.get(ADMIN_COOKIE)?.value) ? 'admin' : 'user',
     action: 'レンタカー返却',
     target: `${r.company} ${r.carModel || ''}`.trim(),
-    detail: `${date} ${time} 返却者: ${by}`,
+    detail: `${date} ${time} 返却者: ${by}${cancelled ? ` / 返却日より後の予約${cancelled}件を取消` : ''}`,
   });
   await persist(data);
   return NextResponse.json({ success: true });

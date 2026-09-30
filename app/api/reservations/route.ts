@@ -31,6 +31,23 @@ export async function POST(req: NextRequest) {
   }
 
   const data = await loadData();
+  // レンタカーの予約: 登録期間（返却済みなら実際に返却した日まで）の中だけ予約できる
+  if (r.rentalId) {
+    const rental = data.rentals.find((x) => x.id === r.rentalId);
+    if (!rental) {
+      return NextResponse.json({ success: false, message: '対象のレンタカーが見つかりません。' }, { status: 404 });
+    }
+    const last = rental.returnedAt || rental.endDate;
+    if (r.startDate < rental.startDate || r.endDate > last) {
+      return NextResponse.json(
+        { success: false, message: `${rental.company} ${rental.carModel || ''} は登録期間（${rental.startDate}〜${last}）の中でだけ予約できます。`.replace('  ', ' ') },
+        { status: 400 }
+      );
+    }
+    r.vehicleId = rental.id;
+    r.vehicleName = `🚗 ${[rental.company, rental.carModel].filter(Boolean).join(' ')}`;
+    r.plate = rental.plate;
+  }
   const clash = data.reservations.find((x) => x.id !== r.id && x.vehicleId === r.vehicleId && startKey(x) < endKey(r) && startKey(r) < endKey(x));
   if (clash) {
     return NextResponse.json(
