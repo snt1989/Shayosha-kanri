@@ -3,6 +3,9 @@ export type MaintRecord = {
   type: string;
   km: number;
   note: string;
+  // 整備台帳で記録する任意項目（既存データには無いので optional）
+  cost?: number;
+  shop?: string;
 };
 
 export type Report = {

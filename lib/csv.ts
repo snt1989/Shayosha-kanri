@@ -153,6 +153,28 @@ export function csvToMasters(text: string): Masters {
   return result;
 }
 
+/* ---------- maintenance ledger ---------- */
+const MAINT_HEADERS = ['実施日', '車両呼称', 'ナンバー', '整備種別', '走行km', '費用（円）', '実施先', '備考'];
+
+export type MaintLedgerRow = {
+  date: string;
+  vehicleName: string;
+  plate: string;
+  type: string;
+  km: number;
+  cost?: number;
+  shop?: string;
+  note: string;
+};
+
+export function maintenanceToCsv(list: MaintLedgerRow[]): string {
+  const rows: (string | number)[][] = [MAINT_HEADERS];
+  list.forEach((m) => {
+    rows.push([m.date, m.vehicleName, m.plate, m.type, m.km, m.cost ?? '', m.shop || '', m.note]);
+  });
+  return toCsv(rows);
+}
+
 /* ---------- logs ---------- */
 const LOG_HEADERS = ['日時', '操作者', '操作内容', '対象', '詳細'];
 

@@ -7,12 +7,13 @@ import StatBar from './StatBar';
 import DashboardTab from './DashboardTab';
 import ReportsTab from './ReportsTab';
 import VehiclesTab from './VehiclesTab';
+import MaintenanceTab from './MaintenanceTab';
 import DriversTab from './DriversTab';
 import AdminTab from './AdminTab';
 import AdminLoginModal from './AdminLoginModal';
 import DriverLoginModal from './DriverLoginModal';
 
-type Tab = 'dashboard' | 'reports' | 'vehicles' | 'drivers' | 'admin';
+type Tab = 'dashboard' | 'reports' | 'vehicles' | 'maintenance' | 'drivers' | 'admin';
 type SyncStatus = 'idle' | 'saving' | 'error';
 const DRIVER_SESSION_KEY = 'fleet_current_driver_id';
 
@@ -295,6 +296,7 @@ export default function FleetApp() {
         {tab === 'vehicles' && (
           <VehiclesTab data={data} onSave={saveVehicle} onDelete={deleteVehicle} onBulkSave={bulkSaveVehicles} />
         )}
+        {tab === 'maintenance' && <MaintenanceTab data={data} onSave={saveVehicle} />}
         {tab === 'drivers' && (
           <DriversTab data={data} onSave={saveDriver} onDelete={deleteDriver} onBulkSave={bulkSaveDrivers} />
         )}
