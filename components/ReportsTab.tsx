@@ -120,6 +120,8 @@ export default function ReportsTab({
 }) {
   const [query, setQuery] = useState('');
   const [editing, setEditing] = useState<Report | null>(null);
+  // 帰着登録（出庫中の日報に帰着情報だけを入れる操作）のとき true。出発登録の入力欄は表示しない。
+  const [returnMode, setReturnMode] = useState(false);
   const [saving, setSaving] = useState(false);
   const [quickDriver, setQuickDriver] = useState<Driver | null>(null);
   const [savingDriver, setSavingDriver] = useState(false);
@@ -135,6 +137,7 @@ export default function ReportsTab({
   // 存在する限り毎回確実に開く。
   useEffect(() => {
     if (openTrigger != null) {
+      setReturnMode(false);
       setEditing(emptyReport(data, currentDriver));
       onQuickReportHandled?.();
     }
@@ -166,6 +169,7 @@ export default function ReportsTab({
   }, [data.reports]);
 
   function openNew() {
+    setReturnMode(false);
     setEditing(emptyReport(data, currentDriver));
   }
   function openEdit(r: Report) {
@@ -173,9 +177,11 @@ export default function ReportsTab({
       onRequestLogin();
       return;
     }
+    setReturnMode(false);
     setEditing({ ...r });
   }
   function openReturnCheckin(r: Report) {
+    setReturnMode(true);
     setEditing({
       ...r,
       postDone: true,
@@ -424,7 +430,7 @@ export default function ReportsTab({
       {editing && (
         <Modal
           tone="dark"
-          title={editing.postDone ? '【帰着後】日報を編集' : editing.id ? '【運転前】出発登録を編集' : '【運転前】出発登録 & アルコール点呼'}
+          title={returnMode ? `【帰着登録】${editing.driverLast} ${editing.driverFirst} / ${editing.vehicleName}` : editing.postDone ? '【帰着後】日報を編集' : editing.id ? '【運転前】出発登録を編集' : '【運転前】出発登録 & アルコール点呼'}
           onClose={() => setEditing(null)}
           footer={
             <>
@@ -432,11 +438,13 @@ export default function ReportsTab({
                 キャンセル
               </button>
               <button className="btn btn-primary" onClick={handleSubmit} disabled={saving}>
-                {saving ? '保存中…' : editing.id ? '保存する' : '出発を登録する（運行開始）'}
+                {saving ? '保存中…' : returnMode ? '帰着を登録する' : editing.id ? '保存する' : '出発を登録する（運行開始）'}
               </button>
             </>
           }
         >
+          {!returnMode && (
+          <>
           <div className="driverpick-row">
             <div className="field">
               <label>登録運転者から選択:</label>
@@ -621,6 +629,8 @@ export default function ReportsTab({
               帰着情報（運転後）も同時に今すぐ一括入力する
             </label>
           </div>
+          </>
+          )}
           {editing.postDone && (
             <>
               <div className="section-heading">帰着後点呼</div>
