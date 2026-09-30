@@ -1,4 +1,4 @@
-import { Driver, LogEntry, MASTER_KEYS, MASTER_LABELS, MasterKey, Masters, Rental, RentalTrip, Vehicle } from './types';
+import { Driver, LogEntry, MASTER_KEYS, MASTER_LABELS, MasterKey, FuelLog, Masters, Rental, RentalTrip, Vehicle } from './types';
 import { genId } from './utils';
 
 function csvEscape(v: unknown): string {
@@ -228,6 +228,16 @@ export function rentalTripsToCsv(trips: RentalTrip[], rentals: Rental[]): string
   trips.forEach((t) => {
     const r = byId.get(t.rentalId);
     rows.push([t.date, t.driver, t.dept || '', t.site || '', r?.company || '', r?.carModel || '', r?.plate || '', t.note]);
+  });
+  return toCsv(rows);
+}
+
+/* ---------- fuel ---------- */
+export function fuelLogsToCsv(list: FuelLog[], efficiency: Map<string, number | null>): string {
+  const rows: (string | number)[][] = [['給油日', '車両呼称', 'ナンバー', '燃料', '給油量（L）', '金額（円）', '単価（円/L）', '走行km', '満タン', '燃費（km/L）', '支払方法', '給油者', '備考']];
+  list.forEach((f) => {
+    const eff = efficiency.get(f.id);
+    rows.push([f.date, f.vehicleName, f.plate, f.fuelType, f.liters, f.amount, f.liters > 0 ? Math.round((f.amount / f.liters) * 10) / 10 : '', f.km, f.full ? '満タン' : '', eff == null ? '' : Math.round(eff * 10) / 10, f.payMethod, f.driver, f.note]);
   });
   return toCsv(rows);
 }

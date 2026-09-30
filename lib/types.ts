@@ -87,6 +87,8 @@ export const MASTER_KEYS = [
   'rentalCompanies',
   'rentalCarClasses',
   'mechanics',
+  'fuelTypes',
+  'payMethods',
 ] as const;
 export type MasterKey = (typeof MASTER_KEYS)[number];
 export type Masters = Record<MasterKey, string[]>;
@@ -101,6 +103,8 @@ export const MASTER_LABELS: Record<MasterKey, string> = {
   rentalCompanies: 'レンタカー会社',
   rentalCarClasses: 'レンタカー車種クラス',
   mechanics: '整備士（整備台帳にログインできる人）',
+  fuelTypes: '燃料種別',
+  payMethods: '給油の支払方法',
 };
 
 export type LogEntry = {
@@ -167,6 +171,25 @@ export type RentalTrip = {
   createdAt: string;
 };
 
+// 給油台帳の1件
+export type FuelLog = {
+  id: string;
+  date: string; // 給油日
+  vehicleId: string;
+  vehicleName: string; // 記録時点の呼称（車両を台帳から消しても残す）
+  plate: string;
+  fuelType: string;
+  liters: number; // 給油量（L）
+  amount: number; // 金額（円）
+  km: number; // 給油時のメーター（km）
+  full: boolean; // 満タン給油か（燃費の計算に使う）
+  payMethod: string;
+  driverId?: string;
+  driver: string; // 給油した人
+  note: string;
+  createdAt: string;
+};
+
 export type EmpIdRule = {
   prefix: string; // 例: EMP-
   digits: number; // 数字部分の桁数（ゼロ埋め）
@@ -180,6 +203,7 @@ export type AppData = {
   reservations: Reservation[];
   rentals: Rental[];
   rentalTrips: RentalTrip[];
+  fuelLogs: FuelLog[];
   vehicles: Vehicle[];
   drivers: Driver[];
   masters: Masters;
@@ -197,6 +221,8 @@ export const DEFAULT_MASTERS: Masters = {
   rentalCompanies: ['トヨタレンタカー', 'ニッポンレンタカー', 'オリックスレンタカー', 'タイムズカー', 'その他'],
   rentalCarClasses: ['軽自動車', 'コンパクト', 'セダン', 'ミニバン・ワゴン', 'SUV', 'トラック・バン', 'その他'],
   mechanics: ['整備士 山本', '整備士 中村'],
+  fuelTypes: ['レギュラー', 'ハイオク', '軽油', 'その他'],
+  payMethods: ['給油カード', '現金（立替）', 'クレジットカード', 'その他'],
 };
 
 export const DEFAULT_VEHICLES: Vehicle[] = [

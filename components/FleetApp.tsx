@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
-import { AppData, Driver, EmpIdRule, Masters, Rental, RentalTrip, Report, Reservation, Vehicle } from '@/lib/types';
+import { AppData, Driver, EmpIdRule, FuelLog, Masters, Rental, RentalTrip, Report, Reservation, Vehicle } from '@/lib/types';
 import Header from './Header';
 import StatBar from './StatBar';
 import DashboardTab from './DashboardTab';
@@ -9,11 +9,12 @@ import ReportsTab from './ReportsTab';
 import MaintenanceTab from './MaintenanceTab';
 import MechanicLoginModal from './MechanicLoginModal';
 import RentalTab from './RentalTab';
+import FuelTab from './FuelTab';
 import AdminTab from './AdminTab';
 import AdminLoginModal from './AdminLoginModal';
 import DriverLoginModal from './DriverLoginModal';
 
-type Tab = 'dashboard' | 'reports' | 'maintenance' | 'rental' | 'admin';
+type Tab = 'dashboard' | 'reports' | 'maintenance' | 'fuel' | 'rental' | 'admin';
 type SyncStatus = 'idle' | 'saving' | 'error';
 const DRIVER_SESSION_KEY = 'fleet_current_driver_id';
 const MECHANIC_SESSION_KEY = 'fleet_current_mechanic';
@@ -205,6 +206,12 @@ export default function FleetApp() {
       throw e;
     }
   }
+  async function saveFuelLog(f: FuelLog) {
+    return rentalAdminCall(() => jsonFetch('/api/fuel-logs', { method: 'POST', body: JSON.stringify(f) }));
+  }
+  async function deleteFuelLog(id: string) {
+    return rentalAdminCall(() => jsonFetch(`/api/fuel-logs/${id}`, { method: 'DELETE' }));
+  }
   async function saveRental(r: Rental) {
     return rentalAdminCall(() => jsonFetch('/api/rentals', { method: 'POST', body: JSON.stringify(r) }));
   }
@@ -265,7 +272,7 @@ export default function FleetApp() {
   function requireDriverLogin(after?: () => void): boolean {
     if (currentDriver) return true;
     afterDriverLoginRef.current = after ?? null;
-    setDriverLoginNotice('出発登録・帰着登録・車両の予約・レンタカーの登録には、運転者としてのログインが必要です。');
+    setDriverLoginNotice('出発登録・帰着登録・車両の予約・レンタカーの登録・給油の記録には、運転者としてのログインが必要です。');
     setShowDriverLogin(true);
     return false;
   }
@@ -432,6 +439,17 @@ export default function FleetApp() {
             canEdit={Boolean(activeMechanic) || isAdmin}
             onRequestMechanicLogin={() => setShowMechanicLogin(true)}
           />}
+        {tab === 'fuel' && (
+          <FuelTab
+            data={data}
+            currentDriver={currentDriver}
+            onRequestDriverLogin={() => requireDriverLogin()}
+            isAdmin={isAdmin}
+            onRequestAdminLogin={() => setShowAdminLogin(true)}
+            onSave={saveFuelLog}
+            onDelete={deleteFuelLog}
+          />
+        )}
         {tab === 'rental' && (
           <RentalTab
             data={data}
