@@ -10,12 +10,15 @@ export default function DriverLoginModal({
   onClose,
   onSelect,
   onRegister,
+  notice,
 }: {
   data: AppData;
   onClose: () => void;
   onSelect: (driver: Driver) => void;
   // 免許証写真で運転者を登録し、そのままその運転者としてログインする
   onRegister: (driver: Driver) => Promise<unknown>;
+  // 入力操作の途中でログインを求めるときの案内
+  notice?: string | null;
 }) {
   const drivers = data.drivers;
   const [query, setQuery] = useState('');
@@ -34,6 +37,12 @@ export default function DriverLoginModal({
 
   return (
     <Modal title="🪪 運転者としてログイン" onClose={onClose} footer={<button className="btn" onClick={onClose}>キャンセル</button>}>
+      {notice && (
+        <div className="alert-item warn" style={{ marginBottom: 12 }} role="alert">
+          <span>🔒</span>
+          <div style={{ flex: 1 }}>{notice}</div>
+        </div>
+      )}
       <p style={{ fontSize: 12.5, color: 'var(--slate-600)', marginTop: 0 }}>
         運転者台帳から自分の名前を選んでください。パスワードは不要です。初めての方は「免許証写真で自動登録」で登録すると、そのままログインします。ログインすると、出発登録の際に運転者情報が自動入力されます。
       </p>

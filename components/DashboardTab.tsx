@@ -10,6 +10,7 @@ export default function DashboardTab({
   onReturnCheckin,
   onOpenMaintenance,
   currentDriver,
+  onRequestDriverLogin,
   onSaveReservation,
   onDeleteReservation,
 }: {
@@ -17,6 +18,7 @@ export default function DashboardTab({
   onReturnCheckin: (id: string) => void;
   onOpenMaintenance: () => void;
   currentDriver?: Driver | null;
+  onRequestDriverLogin: () => void;
   onSaveReservation: (r: Reservation) => Promise<unknown>;
   onDeleteReservation: (id: string) => Promise<unknown>;
 }) {
@@ -108,6 +110,7 @@ export default function DashboardTab({
       <UsageCalendar
         data={data}
         currentDriver={currentDriver}
+        onRequestDriverLogin={onRequestDriverLogin}
         onSaveReservation={onSaveReservation}
         onDeleteReservation={onDeleteReservation}
       />

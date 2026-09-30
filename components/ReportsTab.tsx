@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { AppData, Driver, MAINT_URGENCIES, Report, Vehicle } from '@/lib/types';
-import { genId, nowTimeStr, todayStr } from '@/lib/utils';
+import { nowTimeStr, todayStr } from '@/lib/utils';
 import { downloadCsv } from '@/lib/csv';
 import { extractOdometerReading, loadTesseract } from '@/lib/ocr';
 import Modal from './Modal';
@@ -54,19 +54,6 @@ const emptyReport = (data: AppData, currentDriver?: Driver | null): Report => {
   };
 };
 
-const emptyQuickDriver = (data: AppData): Driver => ({
-  id: '',
-  lastName: '',
-  firstName: '',
-  empId: '',
-  dept: data.masters.departments[0] || '',
-  licenseType: data.masters.licenseTypes[0] || '',
-  licenseExpiry: '',
-  phone: '',
-  licenseNo: '',
-  notes: '本人登録（出発登録画面より）',
-});
-
 function reportsToCsv(reports: Report[]): string {
   const headers = ['日付', '運転者', '使用車両', '行先・用件', '運転前ALC', '運転後ALC', '出発km', '帰着km', '実走行km', 'ステータス', '整備依頼', '特記事項'];
   const esc = (v: unknown) => {
@@ -100,24 +87,25 @@ export default function ReportsTab({
   data,
   onSave,
   onDelete,
-  onSaveDriver,
   openTrigger,
   onQuickReportHandled,
   returnCheckinRequest,
   onReturnCheckinHandled,
   currentDriver,
+  onRequestDriverLogin,
   isAdmin,
   onRequestLogin,
 }: {
   data: AppData;
   onSave: (r: Report) => Promise<unknown>;
   onDelete: (id: string) => Promise<unknown>;
-  onSaveDriver: (d: Driver) => Promise<unknown>;
   openTrigger?: number | null;
   onQuickReportHandled?: () => void;
   returnCheckinRequest?: { id: string; token: number } | null;
   onReturnCheckinHandled?: () => void;
   currentDriver?: Driver | null;
+  // 入力操作は運転者としてログインしているときだけ行える。未ログインのときにログイン画面を開く。
+  onRequestDriverLogin: () => void;
   isAdmin: boolean;
   onRequestLogin: () => void;
 }) {
@@ -126,8 +114,6 @@ export default function ReportsTab({
   // 帰着登録（出庫中の日報に帰着情報だけを入れる操作）のとき true。出発登録の入力欄は表示しない。
   const [returnMode, setReturnMode] = useState(false);
   const [saving, setSaving] = useState(false);
-  const [quickDriver, setQuickDriver] = useState<Driver | null>(null);
-  const [savingDriver, setSavingDriver] = useState(false);
   const photoInputRef = useRef<HTMLInputElement>(null);
   const meterPhotoInputRef = useRef<HTMLInputElement>(null);
   const [meterOcrTarget, setMeterOcrTarget] = useState<'startKm' | 'endKm' | null>(null);
@@ -140,8 +126,12 @@ export default function ReportsTab({
   // 存在する限り毎回確実に開く。
   useEffect(() => {
     if (openTrigger != null) {
-      setReturnMode(false);
-      setEditing(emptyReport(data, currentDriver));
+      if (currentDriver) {
+        setReturnMode(false);
+        setEditing(emptyReport(data, currentDriver));
+      } else {
+        onRequestDriverLogin();
+      }
       onQuickReportHandled?.();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -172,6 +162,10 @@ export default function ReportsTab({
   }, [data.reports]);
 
   function openNew() {
+    if (!currentDriver) {
+      onRequestDriverLogin();
+      return;
+    }
     setReturnMode(false);
     setEditing(emptyReport(data, currentDriver));
   }
@@ -184,6 +178,10 @@ export default function ReportsTab({
     setEditing({ ...r });
   }
   function openReturnCheckin(r: Report) {
+    if (!currentDriver) {
+      onRequestDriverLogin();
+      return;
+    }
     setReturnMode(true);
     setEditing({
       ...r,
@@ -192,46 +190,6 @@ export default function ReportsTab({
       postChecker: r.postChecker || data.masters.checkers[0] || '',
       postMethod: r.postMethod || data.masters.checkMethods[0] || '',
     });
-  }
-
-  function selectDriver(id: string) {
-    if (!editing) return;
-    const d = data.drivers.find((x) => x.id === id);
-    if (!d) {
-      setEditing({ ...editing, driverId: '', driverLast: '', driverFirst: '', dept: editing.dept });
-      return;
-    }
-    const next = { ...editing, driverId: d.id, driverLast: d.lastName, driverFirst: d.firstName, dept: d.dept || editing.dept };
-    // 新規の出発登録で、車両が未選択か「前回車両の自動設定のまま」のときだけ、選んだ運転者の前回車両に切り替える
-    if (!editing.id) {
-      const prevDefault = lastUsedVehicle(data, editing.driverId || undefined);
-      const untouched = !editing.vehicleId || editing.vehicleId === prevDefault?.id;
-      const v = lastUsedVehicle(data, d.id);
-      if (untouched && v) {
-        next.vehicleId = v.id;
-        next.vehicleName = v.name;
-        next.plate = v.plate;
-        next.startKm = v.odometer;
-      }
-    }
-    setEditing(next);
-  }
-
-  async function handleQuickDriverSave() {
-    if (!quickDriver || !editing) return;
-    if (!quickDriver.lastName || !quickDriver.firstName) {
-      alert('氏名（姓・名）は必須です。');
-      return;
-    }
-    const rec: Driver = { ...quickDriver, id: quickDriver.id || genId('d') };
-    setSavingDriver(true);
-    try {
-      await onSaveDriver(rec);
-      setEditing({ ...editing, driverId: rec.id, driverLast: rec.lastName, driverFirst: rec.firstName, dept: rec.dept || editing.dept });
-      setQuickDriver(null);
-    } finally {
-      setSavingDriver(false);
-    }
   }
 
   function selectVehicle(id: string) {
@@ -352,6 +310,16 @@ export default function ReportsTab({
           </div>
         </div>
 
+        {!currentDriver && (
+          <div className="alert-item warn" style={{ margin: '4px 0 12px' }}>
+            <span>🪪</span>
+            <div style={{ flex: 1 }}>出発登録・帰着登録をするには、先に運転者としてログインしてください。</div>
+            <button className="btn btn-sm btn-primary" onClick={onRequestDriverLogin}>
+              運転者としてログイン
+            </button>
+          </div>
+        )}
+
         {filtered.length === 0 ? (
           <div className="empty-state">日報データがありません</div>
         ) : (
@@ -453,7 +421,7 @@ export default function ReportsTab({
       {editing && (
         <Modal
           tone="dark"
-          title={returnMode ? `【帰着登録】${editing.driverLast} ${editing.driverFirst} / ${editing.vehicleName}` : editing.postDone ? '【帰着後】日報を編集' : editing.id ? '【運転前】出発登録を編集' : '【運転前】出発登録 & アルコール点呼'}
+          title={returnMode ? `【帰着登録】${editing.driverLast} ${editing.driverFirst} / ${editing.vehicleName}` : editing.postDone ? '【帰着後】日報を編集' : editing.id ? '【運転前】出発登録を編集' : `【運転前】出発登録 & アルコール点呼（${editing.driverLast} ${editing.driverFirst}）`}
           onClose={() => setEditing(null)}
           footer={
             <>
@@ -468,29 +436,7 @@ export default function ReportsTab({
         >
           {!returnMode && (
           <>
-          <div className="driverpick-row">
-            <div className="field">
-              <label>登録運転者から選択:</label>
-              <select value={editing.driverId || ''} onChange={(e) => selectDriver(e.target.value)}>
-                <option value="">-- 台帳から選択 --</option>
-                {data.drivers.map((d) => (
-                  <option key={d.id} value={d.id}>
-                    {d.lastName} {d.firstName}
-                  </option>
-                ))}
-              </select>
-            </div>
-            <button
-              type="button"
-              className="btn btn-sm"
-              style={{ background: 'var(--green-50, #ecfdf5)', borderColor: 'var(--green-100, #a7f3d0)', color: 'var(--green-600)' }}
-              onClick={() => setQuickDriver(emptyQuickDriver(data))}
-            >
-              🚗 本人登録
-            </button>
-          </div>
-
-          <div className="field-row-4" style={{ marginBottom: 12 }}>
+          <div className="field-row" style={{ marginBottom: 12 }}>
             <div className="field">
               <label>利用日 *</label>
               <input type="date" value={editing.date} onChange={(e) => setEditing({ ...editing, date: e.target.value })} />
@@ -504,14 +450,6 @@ export default function ReportsTab({
                   </option>
                 ))}
               </select>
-            </div>
-            <div className="field">
-              <label>運転者(姓) *</label>
-              <input value={editing.driverLast} onChange={(e) => setEditing({ ...editing, driverLast: e.target.value })} />
-            </div>
-            <div className="field">
-              <label>運転者(名) *</label>
-              <input value={editing.driverFirst} onChange={(e) => setEditing({ ...editing, driverFirst: e.target.value })} />
             </div>
           </div>
 
@@ -778,69 +716,6 @@ export default function ReportsTab({
           <div className="field">
             <label>特記事項</label>
             <textarea rows={2} value={editing.notes} onChange={(e) => setEditing({ ...editing, notes: e.target.value })} />
-          </div>
-        </Modal>
-      )}
-
-      {quickDriver && (
-        <Modal
-          title="🚗 本人登録（簡易運転者登録）"
-          onClose={() => setQuickDriver(null)}
-          footer={
-            <>
-              <button className="btn" onClick={() => setQuickDriver(null)}>
-                キャンセル
-              </button>
-              <button className="btn btn-primary" onClick={handleQuickDriverSave} disabled={savingDriver}>
-                {savingDriver ? '登録中…' : 'この内容で登録して選択する'}
-              </button>
-            </>
-          }
-        >
-          <div className="field-row">
-            <div className="field">
-              <label>氏名（姓）*</label>
-              <input value={quickDriver.lastName} onChange={(e) => setQuickDriver({ ...quickDriver, lastName: e.target.value })} />
-            </div>
-            <div className="field">
-              <label>氏名（名）*</label>
-              <input value={quickDriver.firstName} onChange={(e) => setQuickDriver({ ...quickDriver, firstName: e.target.value })} />
-            </div>
-          </div>
-          <div className="field-row">
-            <div className="field">
-              <label>所属事業部</label>
-              <select value={quickDriver.dept} onChange={(e) => setQuickDriver({ ...quickDriver, dept: e.target.value })}>
-                {data.masters.departments.map((d) => (
-                  <option key={d} value={d}>
-                    {d}
-                  </option>
-                ))}
-              </select>
-            </div>
-            <div className="field">
-              <label>免許種別</label>
-              <select value={quickDriver.licenseType} onChange={(e) => setQuickDriver({ ...quickDriver, licenseType: e.target.value })}>
-                {data.masters.licenseTypes.map((t) => (
-                  <option key={t} value={t}>
-                    {t}
-                  </option>
-                ))}
-              </select>
-            </div>
-          </div>
-          <div className="field-row">
-            <div className="field">
-              <label>連絡先電話番号</label>
-              <input value={quickDriver.phone} onChange={(e) => setQuickDriver({ ...quickDriver, phone: e.target.value })} />
-            </div>
-            <div className="field">
-              <label>免許更新期日</label>
-              <input type="date" value={quickDriver.licenseExpiry} onChange={(e) => setQuickDriver({ ...quickDriver, licenseExpiry: e.target.value })} />
-            </div>
-          </div>
-          <div style={{ fontSize: 11.5, color: 'var(--slate-500)' }}>
-            簡易登録です。免許証番号など詳細情報は管理画面の「運転者台帳」から、管理者がいつでも追記できます。
           </div>
         </Modal>
       )}

@@ -53,11 +53,14 @@ const newReservation = (date: string, vehicleId: string, driver?: Driver | null)
 export default function UsageCalendar({
   data,
   currentDriver,
+  onRequestDriverLogin,
   onSaveReservation,
   onDeleteReservation,
 }: {
   data: AppData;
   currentDriver?: Driver | null;
+  // 予約の追加・変更・取消は運転者としてログインしているときだけ行える
+  onRequestDriverLogin: () => void;
   onSaveReservation: (r: Reservation) => Promise<unknown>;
   onDeleteReservation: (id: string) => Promise<unknown>;
 }) {
@@ -123,29 +126,48 @@ export default function UsageCalendar({
   const dayEntries = byDate.get(selected) || [];
 
   function openNewReservation(date: string) {
+    if (!currentDriver) {
+      onRequestDriverLogin();
+      return;
+    }
     setForm(newReservation(date, vehicleId || data.vehicles[0]?.id || '', currentDriver));
   }
   function setStartDate(value: string) {
     if (!form) return;
     setForm({ ...form, startDate: value, endDate: !form.endDate || form.endDate < value ? value : form.endDate });
   }
+  function openChangeReservation(v: Reservation) {
+    if (!currentDriver) {
+      onRequestDriverLogin();
+      return;
+    }
+    setForm({ ...v });
+  }
   async function submitReservation() {
     if (!form) return;
     const v = data.vehicles.find((x) => x.id === form.vehicleId);
+    // 運転者は、新規ならログイン中の運転者、変更なら予約に入っている運転者
     const d = data.drivers.find((x) => x.id === form.driverId);
     if (!v) {
       alert('車両を選択してください。');
       return;
     }
-    if (!d) {
-      alert('運転者を選択してください。');
+    if (!d && !form.driver) {
+      alert('運転者としてログインしてください。');
       return;
     }
     if (!form.startDate || !form.endDate) {
       alert('利用日を入力してください。');
       return;
     }
-    const rec: Reservation = { ...form, vehicleName: v.name, plate: v.plate, driver: `${d.lastName} ${d.firstName}`.trim(), driverLast: d.lastName };
+    const rec: Reservation = {
+      ...form,
+      vehicleName: v.name,
+      plate: v.plate,
+      // 台帳から削除された運転者の予約は、予約に残っている名前をそのまま使う
+      driver: d ? `${d.lastName} ${d.firstName}`.trim() : form.driver,
+      driverLast: d ? d.lastName : form.driverLast,
+    };
     setSaving(true);
     try {
       await onSaveReservation(rec);
@@ -160,6 +182,10 @@ export default function UsageCalendar({
     }
   }
   async function cancelReservation(v: Reservation) {
+    if (!currentDriver) {
+      onRequestDriverLogin();
+      return;
+    }
     if (!confirm(`${v.vehicleName} の ${rangeLabel(v)}（${v.driver}）の予約を取り消しますか？`)) return;
     try {
       await onDeleteReservation(v.id);
@@ -339,7 +365,7 @@ export default function UsageCalendar({
                     </div>
                   </div>
                   <span className="pill" style={{ background: 'var(--sky-100)', color: 'var(--sky-700)' }}>予約</span>
-                  <button className="btn btn-sm" onClick={() => setForm({ ...v })}>
+                  <button className="btn btn-sm" onClick={() => openChangeReservation(v)}>
                     変更
                   </button>
                   <button className="btn btn-sm btn-danger" onClick={() => cancelReservation(v)}>
@@ -354,7 +380,7 @@ export default function UsageCalendar({
 
       {form && (
         <Modal
-          title={form.id ? '車両の予約を変更' : '車両を予約する'}
+          title={form.id ? `車両の予約を変更（${form.driver}）` : `車両を予約する（${currentDriver ? `${currentDriver.lastName} ${currentDriver.firstName}` : ''}）`}
           onClose={() => setForm(null)}
           footer={
             <>
@@ -367,28 +393,15 @@ export default function UsageCalendar({
             </>
           }
         >
-          <div className="field-row">
-            <div className="field">
-              <label>車両 *</label>
-              <select value={form.vehicleId} onChange={(e) => setForm({ ...form, vehicleId: e.target.value })}>
-                {data.vehicles.map((v) => (
-                  <option key={v.id} value={v.id}>
-                    {v.name}（{v.plate}）
-                  </option>
-                ))}
-              </select>
-            </div>
-            <div className="field">
-              <label>運転者 *</label>
-              <select value={form.driverId || ''} onChange={(e) => setForm({ ...form, driverId: e.target.value })}>
-                <option value="">-- 台帳から選択 --</option>
-                {data.drivers.map((d) => (
-                  <option key={d.id} value={d.id}>
-                    {d.lastName} {d.firstName}
-                  </option>
-                ))}
-              </select>
-            </div>
+          <div className="field">
+            <label>車両 *</label>
+            <select value={form.vehicleId} onChange={(e) => setForm({ ...form, vehicleId: e.target.value })}>
+              {data.vehicles.map((v) => (
+                <option key={v.id} value={v.id}>
+                  {v.name}（{v.plate}）
+                </option>
+              ))}
+            </select>
           </div>
           <div className="field-row">
             <div className="field">

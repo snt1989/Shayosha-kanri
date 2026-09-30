@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { AppData, Driver, Masters, Report, Reservation, Vehicle } from '@/lib/types';
 import Header from './Header';
 import StatBar from './StatBar';
@@ -42,6 +42,9 @@ export default function FleetApp() {
   const [returnCheckinRequest, setReturnCheckinRequest] = useState<{ id: string; token: number } | null>(null);
   const [currentDriverId, setCurrentDriverId] = useState<string | null>(null);
   const [showDriverLogin, setShowDriverLogin] = useState(false);
+  // 入力操作（出発登録・帰着登録・予約）の途中でログインを求めたときの案内と、ログイン後に続ける操作
+  const [driverLoginNotice, setDriverLoginNotice] = useState<string | null>(null);
+  const afterDriverLoginRef = useRef<(() => void) | null>(null);
 
   useEffect(() => {
     load();
@@ -215,17 +218,45 @@ export default function FleetApp() {
     setIsAdmin(false);
   }
 
-  function handleQuickReport() {
+  // 入力操作は運転者としてログインしているときだけ行える。未ログインならログイン画面を開く。
+  // after を渡すと、ログインできた後にその操作を続ける。
+  function requireDriverLogin(after?: () => void): boolean {
+    if (currentDriver) return true;
+    afterDriverLoginRef.current = after ?? null;
+    setDriverLoginNotice('出発登録・帰着登録・車両の予約には、運転者としてのログインが必要です。');
+    setShowDriverLogin(true);
+    return false;
+  }
+  function openDriverLogin() {
+    afterDriverLoginRef.current = null;
+    setDriverLoginNotice(null);
+    setShowDriverLogin(true);
+  }
+  function closeDriverLogin() {
+    afterDriverLoginRef.current = null;
+    setDriverLoginNotice(null);
+    setShowDriverLogin(false);
+  }
+
+  function startQuickReport() {
     setTab('reports');
     setQuickReportTrigger(Date.now());
+  }
+  function handleQuickReport() {
+    if (!requireDriverLogin(startQuickReport)) return;
+    startQuickReport();
   }
   function handleQuickReportHandled() {
     setQuickReportTrigger(null);
   }
 
   function handleReturnCheckin(id: string) {
-    setTab('reports');
-    setReturnCheckinRequest({ id, token: Date.now() });
+    const start = () => {
+      setTab('reports');
+      setReturnCheckinRequest({ id, token: Date.now() });
+    };
+    if (!requireDriverLogin(start)) return;
+    start();
   }
   function handleReturnCheckinHandled() {
     setReturnCheckinRequest(null);
@@ -234,11 +265,16 @@ export default function FleetApp() {
   function handleSelectDriver(driver: Driver) {
     setCurrentDriverId(driver.id);
     setShowDriverLogin(false);
+    setDriverLoginNotice(null);
     try {
       localStorage.setItem(DRIVER_SESSION_KEY, driver.id);
     } catch {
       // ignore
     }
+    // ログインを求められた操作があれば、そのまま続ける（状態の更新はまとめて反映される）
+    const next = afterDriverLoginRef.current;
+    afterDriverLoginRef.current = null;
+    next?.();
   }
 
   function handleDriverLogout() {
@@ -288,7 +324,7 @@ export default function FleetApp() {
         onLogoutAdmin={handleAdminLogout}
         onQuickReport={handleQuickReport}
         currentDriverName={currentDriver ? `${currentDriver.lastName} ${currentDriver.firstName}` : null}
-        onOpenDriverLogin={() => setShowDriverLogin(true)}
+        onOpenDriverLogin={openDriverLogin}
         onDriverLogout={handleDriverLogout}
       />
 
@@ -303,6 +339,7 @@ export default function FleetApp() {
             onReturnCheckin={handleReturnCheckin}
             onOpenMaintenance={() => setTab('maintenance')}
             currentDriver={currentDriver}
+            onRequestDriverLogin={() => requireDriverLogin()}
             onSaveReservation={saveReservation}
             onDeleteReservation={deleteReservation}
           />
@@ -312,12 +349,12 @@ export default function FleetApp() {
             data={data}
             onSave={saveReport}
             onDelete={deleteReport}
-            onSaveDriver={saveDriver}
             openTrigger={quickReportTrigger}
             onQuickReportHandled={handleQuickReportHandled}
             returnCheckinRequest={returnCheckinRequest}
             onReturnCheckinHandled={handleReturnCheckinHandled}
             currentDriver={currentDriver}
+            onRequestDriverLogin={() => requireDriverLogin()}
             isAdmin={isAdmin}
             onRequestLogin={() => setShowAdminLogin(true)}
           />
@@ -351,7 +388,8 @@ export default function FleetApp() {
       {showDriverLogin && (
         <DriverLoginModal
           data={data}
-          onClose={() => setShowDriverLogin(false)}
+          notice={driverLoginNotice}
+          onClose={closeDriverLogin}
           onSelect={handleSelectDriver}
           onRegister={async (d) => {
             await saveDriver(d);
