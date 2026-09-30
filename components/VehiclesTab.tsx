@@ -284,20 +284,9 @@ export default function VehiclesTab({
           title={`🔧 整備記録 — ${viewVehicle.name}`}
           onClose={() => setViewing(null)}
           footer={
-            <>
-              <button className="btn" onClick={() => setViewing(null)}>
-                閉じる
-              </button>
-              <button
-                className="btn btn-primary"
-                onClick={() => {
-                  setViewing(null);
-                  openEdit(viewVehicle);
-                }}
-              >
-                ✏️ 車両情報を編集
-              </button>
-            </>
+            <button className="btn" onClick={() => setViewing(null)}>
+              閉じる
+            </button>
           }
         >
           <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap', fontSize: 13, color: 'var(--slate-600)', marginBottom: 10 }}>
