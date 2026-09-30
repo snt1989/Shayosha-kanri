@@ -32,8 +32,7 @@ const rangeLabel = (v: Reservation) =>
 // 日ごとの表示項目: 日報（使用実績）と予約
 type Entry =
   | { kind: 'report'; time: string; r: Report }
-  | { kind: 'reservation'; time: string; v: Reservation }
-  | { kind: 'rental'; time: string; n: Rental };
+  | { kind: 'reservation'; time: string; v: Reservation };
 
 // レンタカーは車両ではないので専用の色にする
 const RENTAL_COLOR = { bg: '#ffedd5', fg: '#c2410c' };
@@ -106,21 +105,9 @@ export default function UsageCalendar({
         d = addDays(d, 1);
       }
     });
-    // レンタカー: 登録している間だけ、利用期間の各日に表示する（車両での絞り込み中は出さない）
-    if (!vehicleId || vehicleId === RENTAL_FILTER) {
-      (data.rentals || []).forEach((n) => {
-        // 実際の利用日だけ表示する: 返却済みなら実際に返却した日まで、未返却なら登録した返却日まで
-        const last = n.returnedAt || n.endDate || n.startDate;
-        let d = n.startDate;
-        for (let i = 0; d <= last && i < 62; i++) {
-          push(d, { kind: 'rental', time: '00:00', n });
-          d = addDays(d, 1);
-        }
-      });
-    }
     map.forEach((list) => list.sort((a, b) => a.time.localeCompare(b.time)));
     return map;
-  }, [data.reports, data.reservations, data.rentals, vehicleId]);
+  }, [data.reports, data.reservations, vehicleId]);
 
   const [y, m] = month.split('-').map(Number);
   const cells = useMemo(() => {
@@ -143,8 +130,8 @@ export default function UsageCalendar({
       if (!d.startsWith(month)) return;
       list.forEach((e) => {
         if (e.kind === 'report') use++;
-        else if (e.kind === 'reservation') reserved.add(e.v.id);
-        else rented.add(e.n.id);
+        else if (e.v.rentalId) rented.add(e.v.id);
+        else reserved.add(e.v.id);
       });
     });
     return { use, res: reserved.size, rent: rented.size };
@@ -252,10 +239,10 @@ export default function UsageCalendar({
           <h3 className="card-title" style={{ marginBottom: 4 }}>
             📅 車両の使用・予約カレンダー
             <span className="pill pill-slate" style={{ marginLeft: 8 }}>
-              {y}年{m}月　使用{monthCounts.use}件・予約{monthCounts.res}件・レンタカー{monthCounts.rent}件
+              {y}年{m}月　使用{monthCounts.use}件・予約{monthCounts.res}件{monthCounts.rent > 0 ? `・レンタカー予約${monthCounts.rent}件` : ''}
             </span>
           </h3>
-          <div style={{ fontSize: 12, color: 'var(--slate-500)' }}>日報の使用実績、車両の予約、登録中のレンタカーを月単位で確認できます。日付を押すと詳細が表示されます。同じ車両の時間が重なる予約はできません。</div>
+          <div style={{ fontSize: 12, color: 'var(--slate-500)' }}>日報の使用実績と、車両・レンタカーの予約を月単位で確認できます。日付を押すと詳細が表示されます。同じ車両の時間が重なる予約はできません。</div>
         </div>
         <div className="actions">
           <button className="btn btn-sm btn-primary" onClick={() => openNewReservation(selected)} disabled={data.vehicles.length === 0}>
@@ -344,19 +331,6 @@ export default function UsageCalendar({
                       </span>
                     );
                   }
-                  if (e.kind === 'rental') {
-                    const n = e.n;
-                    return (
-                      <span
-                        key={`${n.id}-${key}`}
-                        className="cal-chip"
-                        style={{ background: RENTAL_COLOR.bg, color: RENTAL_COLOR.fg }}
-                        title={`【レンタカー】${n.startDate}〜${n.returnedAt || n.endDate}${n.returnedAt ? '（返却済）' : ''} ${rentalName(n)} ${n.plate}`}
-                      >
-                        🚗 {rentalName(n)}
-                      </span>
-                    );
-                  }
                   const v = e.v;
                   const c = colorOf(v.vehicleId);
                   return (
@@ -412,33 +386,6 @@ export default function UsageCalendar({
                       </div>
                     </div>
                     {r.postDone ? <span className="pill pill-green">帰着済</span> : <span className="pill pill-amber">出庫中</span>}
-                  </div>
-                );
-              }
-              if (e.kind === 'rental') {
-                const n = e.n;
-                const booked = rentalReservations(data.reservations, n.id).filter((v) => v.startDate <= selected && v.endDate >= selected);
-                const drivers = Array.from(new Set(data.rentalTrips.filter((t) => t.rentalId === n.id && t.date === selected).map((t) => t.driver)));
-                return (
-                  <div key={`${n.id}-${selected}`} className="alert-item" style={plain}>
-                    <span className="cal-chip" style={{ background: RENTAL_COLOR.bg, color: RENTAL_COLOR.fg }}>
-                      🚗 レンタカー
-                    </span>
-                    <div style={{ flex: 1 }}>
-                      <strong>{rentalName(n)}</strong>
-                      {n.carClass ? ` / ${n.carClass}` : ''}
-                      <div style={{ fontSize: 12, color: 'var(--slate-500)' }}>
-                        {md(n.startDate)}〜{md(n.returnedAt || n.endDate)}
-                        {n.returnedAt ? `（返却済 ${n.returnedTime || ''} ${n.returnedBy || ''}）` : ''}
-                        {n.plate ? `　${n.plate}` : ''}　登録者: {n.driver}
-                        {drivers.length > 0 ? `　この日の運転者: ${drivers.join('・')}` : ''}
-                      </div>
-                      {booked.length > 0 && (
-                        <div style={{ fontSize: 12, marginTop: 2 }}>
-                          📅 この日の予約: {booked.map((v) => `${reservationRange(v)} ${v.driver}`).join(' ／ ')}
-                        </div>
-                      )}
-                    </div>
                   </div>
                 );
               }
