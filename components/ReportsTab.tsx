@@ -840,7 +840,7 @@ export default function ReportsTab({
             </div>
           </div>
           <div style={{ fontSize: 11.5, color: 'var(--slate-500)' }}>
-            簡易登録です。免許証番号など詳細情報は「運転者台帳」タブからいつでも追記できます。
+            簡易登録です。免許証番号など詳細情報は管理画面の「運転者台帳」から、管理者がいつでも追記できます。
           </div>
         </Modal>
       )}

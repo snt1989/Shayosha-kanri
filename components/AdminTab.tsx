@@ -1,16 +1,24 @@
 'use client';
 
 import { useState } from 'react';
-import { AppData, Masters, MasterKey } from '@/lib/types';
+import { AppData, Driver, Masters, MasterKey, Vehicle } from '@/lib/types';
 import MastersTab from './MastersTab';
 import LogsTab from './LogsTab';
+import VehiclesTab from './VehiclesTab';
+import DriversTab from './DriversTab';
 
-type AdminSection = 'masters' | 'logs';
+type AdminSection = 'vehicles' | 'drivers' | 'masters' | 'logs';
 
 export default function AdminTab({
   data,
   isAdmin,
   adminConfigured,
+  onSaveVehicle,
+  onDeleteVehicle,
+  onBulkSaveVehicles,
+  onSaveDriver,
+  onDeleteDriver,
+  onBulkSaveDrivers,
   onSaveCategory,
   onSaveAll,
   onRequestLogin,
@@ -19,12 +27,18 @@ export default function AdminTab({
   data: AppData;
   isAdmin: boolean;
   adminConfigured: boolean;
+  onSaveVehicle: (v: Vehicle) => Promise<unknown>;
+  onDeleteVehicle: (id: string) => Promise<unknown>;
+  onBulkSaveVehicles: (list: Vehicle[]) => Promise<unknown>;
+  onSaveDriver: (d: Driver) => Promise<unknown>;
+  onDeleteDriver: (id: string) => Promise<unknown>;
+  onBulkSaveDrivers: (list: Driver[]) => Promise<unknown>;
   onSaveCategory: (category: MasterKey, items: string[]) => Promise<unknown>;
   onSaveAll: (masters: Masters) => Promise<unknown>;
   onRequestLogin: () => void;
   onClearLogs: () => Promise<unknown>;
 }) {
-  const [section, setSection] = useState<AdminSection>('masters');
+  const [section, setSection] = useState<AdminSection>('vehicles');
 
   if (!isAdmin) {
     return (
@@ -33,7 +47,7 @@ export default function AdminTab({
           <div className="lock-ic">🔒</div>
           <h3>管理者ログインが必要です</h3>
           <p>
-            各種マスタ設定・操作ログ／バックアップは、誤操作・改ざん防止のため管理者のみ利用できます。
+            社用車台帳・運転者台帳・各種マスタ設定・操作ログ／バックアップは、誤操作・改ざん防止のため管理者のみ利用できます。
           </p>
           <button className="btn btn-primary" onClick={onRequestLogin}>
             🔒 管理者ログイン
@@ -55,9 +69,15 @@ export default function AdminTab({
           🛠️ 管理画面
         </h3>
         <div style={{ fontSize: 12, color: 'var(--slate-500)', marginBottom: 12 }}>
-          各種マスタ設定と操作ログ・バックアップをまとめて管理します。
+          社用車台帳・運転者台帳・各種マスタ設定と、操作ログ・バックアップをまとめて管理します。
         </div>
         <div className="subtabbar">
+          <button className={`subtab ${section === 'vehicles' ? 'active' : ''}`} onClick={() => setSection('vehicles')}>
+            <span>🚗</span>社用車台帳
+          </button>
+          <button className={`subtab ${section === 'drivers' ? 'active' : ''}`} onClick={() => setSection('drivers')}>
+            <span>🪪</span>運転者台帳
+          </button>
           <button className={`subtab ${section === 'masters' ? 'active' : ''}`} onClick={() => setSection('masters')}>
             <span>⚙️</span>各種マスタ設定
           </button>
@@ -67,6 +87,12 @@ export default function AdminTab({
         </div>
       </div>
 
+      {section === 'vehicles' && (
+        <VehiclesTab data={data} onSave={onSaveVehicle} onDelete={onDeleteVehicle} onBulkSave={onBulkSaveVehicles} />
+      )}
+      {section === 'drivers' && (
+        <DriversTab data={data} onSave={onSaveDriver} onDelete={onDeleteDriver} onBulkSave={onBulkSaveDrivers} />
+      )}
       {section === 'masters' && (
         <MastersTab
           masters={data.masters}

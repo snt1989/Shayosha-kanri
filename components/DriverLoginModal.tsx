@@ -32,7 +32,7 @@ export default function DriverLoginModal({
       </div>
       {filtered.length === 0 ? (
         <div className="empty-state">
-          {drivers.length === 0 ? '運転者が登録されていません。先に運転者台帳から登録してください。' : '該当する運転者が見つかりません。'}
+          {drivers.length === 0 ? '運転者が登録されていません。管理画面（管理者ログインが必要）の運転者台帳から登録してください。' : '該当する運転者が見つかりません。'}
         </div>
       ) : (
         <div className="driver-login-list">
