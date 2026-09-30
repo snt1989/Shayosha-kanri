@@ -83,6 +83,8 @@ export const MASTER_KEYS = [
   'maintTypes',
   'tireTypes',
   'licenseTypes',
+  'rentalCompanies',
+  'rentalCarClasses',
 ] as const;
 export type MasterKey = (typeof MASTER_KEYS)[number];
 export type Masters = Record<MasterKey, string[]>;
@@ -94,6 +96,8 @@ export const MASTER_LABELS: Record<MasterKey, string> = {
   maintTypes: '整備種別',
   tireTypes: 'タイヤ種別',
   licenseTypes: '免許種別',
+  rentalCompanies: 'レンタカー会社',
+  rentalCarClasses: 'レンタカー車種クラス',
 };
 
 export type LogEntry = {
@@ -124,6 +128,38 @@ export type Reservation = {
   createdAt: string;
 };
 
+export const RENTAL_STATUSES = ['予約済', '貸出中', '返却済', 'キャンセル'] as const;
+export type RentalStatus = (typeof RENTAL_STATUSES)[number];
+
+// レンタカーの利用記録（社用車とは別管理）
+export type Rental = {
+  id: string;
+  status: RentalStatus;
+  company: string; // レンタカー会社
+  carClass: string; // 車種クラス
+  carModel: string; // 車種（例: ヤリス）
+  plate: string; // 借りた車のナンバー（貸出時に判明）
+  reservationNo: string; // 予約番号
+  driverId?: string;
+  driver: string;
+  dept: string;
+  purpose: string;
+  destination: string;
+  startDate: string;
+  endDate: string;
+  pickupPlace: string; // 出発店舗
+  returnPlace: string; // 返却店舗
+  estimateCost: number; // 見積金額
+  cost: number; // 確定金額（返却後）
+  startKm: number;
+  endKm: number;
+  fuelFull: boolean; // 満タン返却
+  damageNote: string; // 傷・事故等の申告
+  notes: string;
+  returnedAt?: string;
+  createdAt: string;
+};
+
 export type EmpIdRule = {
   prefix: string; // 例: EMP-
   digits: number; // 数字部分の桁数（ゼロ埋め）
@@ -135,6 +171,7 @@ export type AppData = {
   reports: Report[];
   empIdRule: EmpIdRule;
   reservations: Reservation[];
+  rentals: Rental[];
   vehicles: Vehicle[];
   drivers: Driver[];
   masters: Masters;
@@ -149,6 +186,8 @@ export const DEFAULT_MASTERS: Masters = {
   maintTypes: ['オイル交換', '車検完了', '12ヶ月点検', 'タイヤ交換', '修理・洗車', 'その他'],
   tireTypes: ['夏タイヤ（ノーマル）', 'スタッドレス（冬用）', 'オールシーズン'],
   licenseTypes: ['普通第一種', '準中型（5t限定含む）', '中型（8t限定含む）', '大型第一種', '第二種免許'],
+  rentalCompanies: ['トヨタレンタカー', 'ニッポンレンタカー', 'オリックスレンタカー', 'タイムズカー', 'その他'],
+  rentalCarClasses: ['軽自動車', 'コンパクト', 'セダン', 'ミニバン・ワゴン', 'SUV', 'トラック・バン', 'その他'],
 };
 
 export const DEFAULT_VEHICLES: Vehicle[] = [

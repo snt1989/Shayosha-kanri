@@ -1,4 +1,4 @@
-import { Driver, LogEntry, MASTER_KEYS, MASTER_LABELS, MasterKey, Masters, Vehicle } from './types';
+import { Driver, LogEntry, MASTER_KEYS, MASTER_LABELS, MasterKey, Masters, Rental, Vehicle } from './types';
 import { genId } from './utils';
 
 function csvEscape(v: unknown): string {
@@ -208,4 +208,19 @@ export function downloadJson(filename: string, data: unknown) {
   a.click();
   document.body.removeChild(a);
   URL.revokeObjectURL(url);
+}
+
+/* ---------- rentals ---------- */
+const RENTAL_HEADERS = ['状態', '利用開始日', '返却日', 'レンタカー会社', '車種クラス', '車種', 'ナンバー', '予約番号', '利用者', '部署', '行先', '用件', '出発店舗', '返却店舗', '見積金額', '確定金額', '出発メーター', '返却メーター', '満タン返却', '傷・事故の申告', '備考'];
+
+export function rentalsToCsv(list: Rental[]): string {
+  const rows: (string | number)[][] = [RENTAL_HEADERS];
+  list.forEach((r) => {
+    rows.push([
+      r.status, r.startDate, r.endDate, r.company, r.carClass, r.carModel, r.plate, r.reservationNo, r.driver, r.dept,
+      r.destination, r.purpose, r.pickupPlace, r.returnPlace, r.estimateCost || '', r.cost || '', r.startKm || '', r.endKm || '',
+      r.status === '返却済' ? (r.fuelFull ? 'はい' : 'いいえ') : '', r.damageNote, r.notes,
+    ]);
+  });
+  return toCsv(rows);
 }

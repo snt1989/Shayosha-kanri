@@ -1,17 +1,18 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
-import { AppData, Driver, EmpIdRule, Masters, Report, Reservation, Vehicle } from '@/lib/types';
+import { AppData, Driver, EmpIdRule, Masters, Rental, Report, Reservation, Vehicle } from '@/lib/types';
 import Header from './Header';
 import StatBar from './StatBar';
 import DashboardTab from './DashboardTab';
 import ReportsTab from './ReportsTab';
 import MaintenanceTab from './MaintenanceTab';
+import RentalTab from './RentalTab';
 import AdminTab from './AdminTab';
 import AdminLoginModal from './AdminLoginModal';
 import DriverLoginModal from './DriverLoginModal';
 
-type Tab = 'dashboard' | 'reports' | 'maintenance' | 'admin';
+type Tab = 'dashboard' | 'reports' | 'maintenance' | 'rental' | 'admin';
 type SyncStatus = 'idle' | 'saving' | 'error';
 const DRIVER_SESSION_KEY = 'fleet_current_driver_id';
 
@@ -189,6 +190,12 @@ export default function FleetApp() {
       throw e;
     }
   }
+  async function saveRental(r: Rental) {
+    return withSync(() => jsonFetch('/api/rentals', { method: 'POST', body: JSON.stringify(r) }));
+  }
+  async function deleteRental(id: string) {
+    return withSync(() => jsonFetch(`/api/rentals/${id}`, { method: 'DELETE' }));
+  }
   async function saveEmpIdRule(r: EmpIdRule & { assignMissing?: boolean }) {
     try {
       return await withSync(() => jsonFetch('/api/masters/emp-id-rule', { method: 'POST', body: JSON.stringify(r) }));
@@ -231,7 +238,7 @@ export default function FleetApp() {
   function requireDriverLogin(after?: () => void): boolean {
     if (currentDriver) return true;
     afterDriverLoginRef.current = after ?? null;
-    setDriverLoginNotice('出発登録・帰着登録・車両の予約には、運転者としてのログインが必要です。');
+    setDriverLoginNotice('出発登録・帰着登録・車両やレンタカーの予約には、運転者としてのログインが必要です。');
     setShowDriverLogin(true);
     return false;
   }
@@ -368,6 +375,15 @@ export default function FleetApp() {
           />
         )}
         {tab === 'maintenance' && <MaintenanceTab data={data} onSave={saveVehicle} onResolveRequest={resolveMaintRequest} />}
+        {tab === 'rental' && (
+          <RentalTab
+            data={data}
+            currentDriver={currentDriver}
+            onRequestDriverLogin={() => requireDriverLogin()}
+            onSave={saveRental}
+            onDelete={deleteRental}
+          />
+        )}
         {tab === 'admin' && (
           <AdminTab
             data={data}

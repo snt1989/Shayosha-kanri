@@ -13,6 +13,8 @@ const ICONS: Record<MasterKey, string> = {
   maintTypes: '🔧',
   tireTypes: '🛞',
   licenseTypes: '🪪',
+  rentalCompanies: '🏢',
+  rentalCarClasses: '🚙',
 };
 
 export default function MastersTab({
