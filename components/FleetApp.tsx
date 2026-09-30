@@ -205,8 +205,11 @@ export default function FleetApp() {
   async function deleteRental(id: string) {
     return rentalAdminCall(() => jsonFetch(`/api/rentals/${id}`, { method: 'DELETE' }));
   }
-  async function returnRental(id: string) {
-    return withSync(() => jsonFetch(`/api/rentals/${id}/return`, { method: 'POST', body: JSON.stringify({}) }));
+  async function returnRental(id: string, info: { date: string; time: string; by: string; byId?: string }) {
+    return withSync(() => jsonFetch(`/api/rentals/${id}/return`, { method: 'POST', body: JSON.stringify(info) }));
+  }
+  async function cancelReturnRental(id: string) {
+    return withSync(() => jsonFetch(`/api/rentals/${id}/return`, { method: 'DELETE' }));
   }
   async function saveRentalTrip(t: RentalTrip) {
     return rentalAdminCall(() => jsonFetch('/api/rental-trips', { method: 'POST', body: JSON.stringify(t) }));
@@ -400,6 +403,7 @@ export default function FleetApp() {
             onRequestDriverLogin={() => requireDriverLogin()}
             onSave={saveRental}
             onReturn={returnRental}
+            onCancelReturn={cancelReturnRental}
             isAdmin={isAdmin}
             onRequestAdminLogin={() => setShowAdminLogin(true)}
             onDelete={deleteRental}

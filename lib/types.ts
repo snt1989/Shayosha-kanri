@@ -143,7 +143,10 @@ export type Rental = {
   endDate: string;
   cost: number; // 料金（円）
   notes: string;
-  returnedAt?: string; // 返却した日（返却ボタンで記録）。未設定なら利用中
+  returnedAt?: string; // 実際に返却した日。未設定なら利用中
+  returnedTime?: string; // 返却した時刻 HH:MM
+  returnedBy?: string; // 返却した人
+  returnedById?: string; // 返却者が運転者台帳の人のとき
   createdAt: string;
 };
 

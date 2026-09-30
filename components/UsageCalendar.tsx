@@ -108,8 +108,10 @@ export default function UsageCalendar({
     // レンタカー: 登録している間だけ、利用期間の各日に表示する（車両での絞り込み中は出さない）
     if (!vehicleId || vehicleId === RENTAL_FILTER) {
       (data.rentals || []).forEach((n) => {
+        // 実際の利用日だけ表示する: 返却済みなら実際に返却した日まで、未返却なら登録した返却日まで
+        const last = n.returnedAt || n.endDate || n.startDate;
         let d = n.startDate;
-        for (let i = 0; d <= (n.endDate || n.startDate) && i < 62; i++) {
+        for (let i = 0; d <= last && i < 62; i++) {
           push(d, { kind: 'rental', time: '00:00', n });
           d = addDays(d, 1);
         }
@@ -323,7 +325,7 @@ export default function UsageCalendar({
                         key={`${n.id}-${key}`}
                         className="cal-chip"
                         style={{ background: RENTAL_COLOR.bg, color: RENTAL_COLOR.fg }}
-                        title={`【レンタカー】${n.startDate}〜${n.endDate} ${rentalName(n)} ${n.plate}`}
+                        title={`【レンタカー】${n.startDate}〜${n.returnedAt || n.endDate}${n.returnedAt ? '（返却済）' : ''} ${rentalName(n)} ${n.plate}`}
                       >
                         🚗 {rentalName(n)}
                       </span>
@@ -399,7 +401,8 @@ export default function UsageCalendar({
                       <strong>{rentalName(n)}</strong>
                       {n.carClass ? ` / ${n.carClass}` : ''}
                       <div style={{ fontSize: 12, color: 'var(--slate-500)' }}>
-                        {md(n.startDate)}〜{md(n.endDate)}
+                        {md(n.startDate)}〜{md(n.returnedAt || n.endDate)}
+                        {n.returnedAt ? `（返却済 ${n.returnedTime || ''} ${n.returnedBy || ''}）` : ''}
                         {n.plate ? `　${n.plate}` : ''}　登録者: {n.driver}
                         {drivers.length > 0 ? `　この日の運転者: ${drivers.join('・')}` : ''}
                       </div>

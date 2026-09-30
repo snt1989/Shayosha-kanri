@@ -33,6 +33,7 @@ export default function RentalTab({
   onSave,
   onDelete,
   onReturn,
+  onCancelReturn,
   isAdmin,
   onRequestAdminLogin,
   onSaveTrip,
@@ -43,7 +44,8 @@ export default function RentalTab({
   onRequestDriverLogin: () => void;
   onSave: (r: Rental) => Promise<unknown>;
   onDelete: (id: string) => Promise<unknown>;
-  onReturn: (id: string) => Promise<unknown>;
+  onReturn: (id: string, info: { date: string; time: string; by: string; byId?: string }) => Promise<unknown>;
+  onCancelReturn: (id: string) => Promise<unknown>;
   isAdmin: boolean;
   onRequestAdminLogin: () => void;
   onSaveTrip: (t: RentalTrip) => Promise<unknown>;
@@ -54,6 +56,8 @@ export default function RentalTab({
   const [query, setQuery] = useState('');
   const [rec, setRec] = useState<Rental | null>(null);
   const [saving, setSaving] = useState(false);
+  const [ret, setRet] = useState<{ rental: Rental; date: string; time: string; pick: string; by: string } | null>(null);
+  const [returnError, setReturnError] = useState('');
   const [error, setError] = useState('');
 
   const month = todayStr().slice(0, 7);
@@ -80,13 +84,46 @@ export default function RentalTab({
     if (!isAdmin) return onRequestAdminLogin();
     fn();
   }
-  async function doReturn(r: Rental) {
-    if (!currentDriver) return onRequestDriverLogin();
-    if (!confirm(`${r.company} ${r.carModel || ''} を本日返却として記録しますか？`)) return;
+  // 返却の入力画面（返却者・返却日・返却時刻）
+  function openReturn(r: Rental) {
+    guard(() => {
+      setReturnError('');
+      const now = new Date();
+      const pad = (n: number) => String(n).padStart(2, '0');
+      const date = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`;
+      setRet({
+        rental: r,
+        date: date < r.startDate ? r.startDate : date,
+        time: `${pad(now.getHours())}:${pad(now.getMinutes())}`,
+        pick: currentDriver!.id,
+        by: `${currentDriver!.lastName} ${currentDriver!.firstName}`,
+      });
+    });
+  }
+  async function submitReturn() {
+    if (!ret) return;
+    if (!ret.by.trim()) return setReturnError('返却者を選ぶか、名前を入力してください。');
+    if (!ret.date) return setReturnError('返却日を入力してください。');
+    if (ret.date < ret.rental.startDate) return setReturnError('返却日は利用開始日以降にしてください。');
+    if (!ret.time) return setReturnError('返却時刻を入力してください。');
+    setSaving(true);
+    setReturnError('');
     try {
-      await onReturn(r.id);
+      await onReturn(ret.rental.id, { date: ret.date, time: ret.time, by: ret.by.trim(), byId: ret.pick && ret.pick !== '__other__' ? ret.pick : undefined });
+      setRet(null);
     } catch (e) {
-      alert((e as Error)?.message || '返却を記録できませんでした。');
+      setReturnError((e as Error)?.message || '返却を記録できませんでした。');
+    } finally {
+      setSaving(false);
+    }
+  }
+  async function cancelReturn(r: Rental) {
+    if (!currentDriver) return onRequestDriverLogin();
+    if (!confirm(`${r.company} ${r.carModel || ''} の返却（${r.returnedAt} ${r.returnedTime || ''} ${r.returnedBy || ''}）を取り消して、利用中に戻しますか？`)) return;
+    try {
+      await onCancelReturn(r.id);
+    } catch (e) {
+      alert((e as Error)?.message || '取り消せませんでした。');
     }
   }
   function openNew() {
@@ -224,7 +261,10 @@ export default function RentalTab({
                       <span className="cell-sub">{[r.carClass, r.carModel, r.plate].filter(Boolean).join(' / ') || '-'}</span>
                       {r.reservationNo && <span className="cell-sub">予約番号 {r.reservationNo}</span>}
                       {r.returnedAt ? (
-                        <span className="pill pill-green cell-sub-pill">返却済 {r.returnedAt}</span>
+                        <span className="pill pill-green cell-sub-pill">
+                          返却済 {r.returnedAt.slice(5).replace('-', '/')} {r.returnedTime || ''}
+                          {r.returnedBy ? `　${r.returnedBy}` : ''}
+                        </span>
                       ) : (
                         <span className="pill pill-amber cell-sub-pill">利用中</span>
                       )}
@@ -238,8 +278,12 @@ export default function RentalTab({
                     </td>
                     <td>
                       <div className="eactions" onClick={(e) => e.stopPropagation()}>
-                        {!r.returnedAt && (
-                          <button className="btn btn-sm btn-primary" onClick={() => doReturn(r)}>
+                        {r.returnedAt ? (
+                          <button className="btn btn-sm" onClick={() => cancelReturn(r)}>
+                            ↩️ 返却を取り消し
+                          </button>
+                        ) : (
+                          <button className="btn btn-sm btn-primary" onClick={() => openReturn(r)}>
                             ↩️ 返却
                           </button>
                         )}
@@ -258,6 +302,66 @@ export default function RentalTab({
           </div>
         )}
       </div>
+
+      {ret && (
+        <Modal
+          title="↩️ レンタカーの返却"
+          onClose={() => setRet(null)}
+          footer={
+            <>
+              <button className="btn" onClick={() => setRet(null)}>
+                キャンセル
+              </button>
+              <button className="btn btn-primary" onClick={submitReturn} disabled={saving}>
+                {saving ? '保存中…' : '返却済にする'}
+              </button>
+            </>
+          }
+        >
+          {returnError && (
+            <div className="alert-item warn" style={{ marginBottom: 10 }}>
+              {returnError}
+            </div>
+          )}
+          <div style={{ fontSize: 13, color: 'var(--slate-600)', marginBottom: 10 }}>
+            <b>{ret.rental.company}</b> {[ret.rental.carClass, ret.rental.carModel, ret.rental.plate].filter(Boolean).join(' / ')}　{ret.rental.startDate}〜{ret.rental.endDate}
+          </div>
+          <div className="field-row">
+            <div className="field">
+              <label>返却日</label>
+              <input type="date" value={ret.date} onChange={(e) => setRet({ ...ret, date: e.target.value })} />
+            </div>
+            <div className="field">
+              <label>返却時刻</label>
+              <input type="time" value={ret.time} onChange={(e) => setRet({ ...ret, time: e.target.value })} />
+            </div>
+          </div>
+          <div className="field">
+            <label>返却者</label>
+            <select
+              value={ret.pick}
+              onChange={(e) => {
+                const v = e.target.value;
+                const d = data.drivers.find((x) => x.id === v);
+                setRet({ ...ret, pick: v, by: d ? `${d.lastName} ${d.firstName}` : '' });
+              }}
+            >
+              {data.drivers.map((d) => (
+                <option key={d.id} value={d.id}>
+                  {d.lastName} {d.firstName}
+                </option>
+              ))}
+              <option value="__other__">その他（台帳にない人）</option>
+            </select>
+          </div>
+          {ret.pick === '__other__' && (
+            <div className="field">
+              <label>返却者の名前</label>
+              <input value={ret.by} placeholder="例: ○○商事 佐藤" onChange={(e) => setRet({ ...ret, by: e.target.value })} />
+            </div>
+          )}
+        </Modal>
+      )}
 
       {rec && (
         <Modal
