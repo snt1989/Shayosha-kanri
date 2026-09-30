@@ -1,7 +1,8 @@
 'use client';
 
 import { useRef, useState } from 'react';
-import { MASTER_KEYS, MASTER_LABELS, MasterKey, Masters } from '@/lib/types';
+import { Driver, EmpIdRule, MASTER_KEYS, MASTER_LABELS, MasterKey, Masters } from '@/lib/types';
+import EmpIdRuleCard from './EmpIdRuleCard';
 import { csvToMasters, downloadCsv, mastersToCsv } from '@/lib/csv';
 import { todayStr } from '@/lib/utils';
 
@@ -16,6 +17,9 @@ const ICONS: Record<MasterKey, string> = {
 
 export default function MastersTab({
   masters,
+  empIdRule,
+  drivers,
+  onSaveEmpIdRule,
   isAdmin,
   adminConfigured,
   onSaveCategory,
@@ -23,6 +27,9 @@ export default function MastersTab({
   onRequestLogin,
 }: {
   masters: Masters;
+  empIdRule: EmpIdRule;
+  drivers: Driver[];
+  onSaveEmpIdRule: (r: EmpIdRule & { assignMissing?: boolean }) => Promise<unknown>;
   isAdmin: boolean;
   adminConfigured: boolean;
   onSaveCategory: (category: MasterKey, items: string[]) => Promise<unknown>;
@@ -154,6 +161,8 @@ export default function MastersTab({
   }
 
   return (
+    <div>
+    <EmpIdRuleCard rule={empIdRule} drivers={drivers} onSave={onSaveEmpIdRule} />
     <div className="card">
       <div className="toolbar2" style={{ marginBottom: 4, alignItems: 'flex-start' }}>
         <div>
@@ -293,6 +302,7 @@ export default function MastersTab({
           )}
         </div>
       </div>
+    </div>
     </div>
   );
 }

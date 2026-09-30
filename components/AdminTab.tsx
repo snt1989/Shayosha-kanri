@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { AppData, Driver, Masters, MasterKey, Vehicle } from '@/lib/types';
+import { AppData, Driver, EmpIdRule, Masters, MasterKey, Vehicle } from '@/lib/types';
 import MastersTab from './MastersTab';
 import LogsTab from './LogsTab';
 import VehiclesTab from './VehiclesTab';
@@ -21,6 +21,7 @@ export default function AdminTab({
   onBulkSaveDrivers,
   onSaveCategory,
   onSaveAll,
+  onSaveEmpIdRule,
   onRequestLogin,
   onClearLogs,
 }: {
@@ -35,6 +36,7 @@ export default function AdminTab({
   onBulkSaveDrivers: (list: Driver[]) => Promise<unknown>;
   onSaveCategory: (category: MasterKey, items: string[]) => Promise<unknown>;
   onSaveAll: (masters: Masters) => Promise<unknown>;
+  onSaveEmpIdRule: (r: EmpIdRule & { assignMissing?: boolean }) => Promise<unknown>;
   onRequestLogin: () => void;
   onClearLogs: () => Promise<unknown>;
 }) {
@@ -96,6 +98,9 @@ export default function AdminTab({
       {section === 'masters' && (
         <MastersTab
           masters={data.masters}
+          empIdRule={data.empIdRule}
+          drivers={data.drivers}
+          onSaveEmpIdRule={onSaveEmpIdRule}
           isAdmin={isAdmin}
           adminConfigured={adminConfigured}
           onSaveCategory={onSaveCategory}

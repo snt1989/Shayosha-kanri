@@ -3,6 +3,7 @@ import { loadData, saveData } from '@/lib/store';
 import { Driver } from '@/lib/types';
 import { ADMIN_COOKIE, isAdminCookieValid } from '@/lib/admin';
 import { pushLog } from '@/lib/log';
+import { assignMissingEmpIds } from '@/lib/empId';
 
 export const dynamic = 'force-dynamic';
 
@@ -17,8 +18,12 @@ export async function POST(req: NextRequest) {
   const data = await loadData();
   const idx = data.drivers.findIndex((x) => x.id === d.id);
   if (idx >= 0) {
+    if (!d.empId?.trim()) d.empId = data.drivers[idx].empId || '';
+    assignMissingEmpIds(data, [d]);
     data.drivers[idx] = d;
   } else {
+    d.empId = (d.empId || '').trim();
+    assignMissingEmpIds(data, [d]);
     data.drivers.push(d);
   }
 
@@ -26,7 +31,7 @@ export async function POST(req: NextRequest) {
     actor: isAdminReq ? 'admin' : 'user',
     action: isNew || idx < 0 ? '運転者新規登録' : '運転者更新',
     target: `${d.lastName} ${d.firstName}`,
-    detail: d.dept,
+    detail: `${d.dept} ${d.empId}`,
   });
 
   await saveData({
@@ -35,7 +40,8 @@ export async function POST(req: NextRequest) {
     drivers: data.drivers,
     masters: data.masters,
     logs: data.logs,
+    empIdRule: data.empIdRule,
   });
 
-  return NextResponse.json({ success: true, id: d.id });
+  return NextResponse.json({ success: true, id: d.id, empId: d.empId });
 }

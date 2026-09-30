@@ -2,6 +2,7 @@
 
 import { useMemo, useRef, useState } from 'react';
 import { AppData, Driver } from '@/lib/types';
+import { previewEmpId } from '@/lib/empId';
 import { daysUntil, todayStr } from '@/lib/utils';
 import { csvToDrivers, downloadCsv, driversToCsv } from '@/lib/csv';
 import Modal from './Modal';
@@ -297,7 +298,11 @@ export default function DriversTab({
           <div className="field-row">
             <div className="field">
               <label>社員番号</label>
-              <input value={editing.empId} onChange={(e) => setEditing({ ...editing, empId: e.target.value })} />
+              <input
+                value={editing.empId}
+                placeholder={editing.id ? '' : `空欄で自動採番（${previewEmpId(data)}）`}
+                onChange={(e) => setEditing({ ...editing, empId: e.target.value })}
+              />
             </div>
             <div className="field">
               <label>所属事業部</label>

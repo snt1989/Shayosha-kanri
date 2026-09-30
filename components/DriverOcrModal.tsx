@@ -2,6 +2,7 @@
 
 import { useRef, useState } from 'react';
 import { AppData, Driver } from '@/lib/types';
+import { previewEmpId } from '@/lib/empId';
 import { genId } from '@/lib/utils';
 import { loadTesseract } from '@/lib/ocr';
 import Modal from './Modal';
@@ -166,7 +167,11 @@ export default function DriverOcrModal({
       <div className="field-row">
         <div className="field">
           <label>社員番号</label>
-          <input value={form.empId} onChange={(e) => setForm({ ...form, empId: e.target.value })} />
+          <input
+            value={form.empId}
+            placeholder={`空欄で自動採番（${previewEmpId(data)}）`}
+            onChange={(e) => setForm({ ...form, empId: e.target.value })}
+          />
         </div>
         <div className="field">
           <label>所属事業部</label>

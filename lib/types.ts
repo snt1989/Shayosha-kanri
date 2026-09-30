@@ -124,8 +124,16 @@ export type Reservation = {
   createdAt: string;
 };
 
+export type EmpIdRule = {
+  prefix: string; // 例: EMP-
+  digits: number; // 数字部分の桁数（ゼロ埋め）
+  next: number; // 次に振る番号
+};
+export const DEFAULT_EMP_ID_RULE: EmpIdRule = { prefix: 'EMP-', digits: 3, next: 1 };
+
 export type AppData = {
   reports: Report[];
+  empIdRule: EmpIdRule;
   reservations: Reservation[];
   vehicles: Vehicle[];
   drivers: Driver[];

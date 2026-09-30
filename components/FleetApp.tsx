@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
-import { AppData, Driver, Masters, Report, Reservation, Vehicle } from '@/lib/types';
+import { AppData, Driver, EmpIdRule, Masters, Report, Reservation, Vehicle } from '@/lib/types';
 import Header from './Header';
 import StatBar from './StatBar';
 import DashboardTab from './DashboardTab';
@@ -184,6 +184,14 @@ export default function FleetApp() {
   async function saveAllMasters(masters: Masters) {
     try {
       return await withSync(() => jsonFetch('/api/masters/all', { method: 'POST', body: JSON.stringify(masters) }));
+    } catch (e) {
+      handleAdminApiError(e);
+      throw e;
+    }
+  }
+  async function saveEmpIdRule(r: EmpIdRule & { assignMissing?: boolean }) {
+    try {
+      return await withSync(() => jsonFetch('/api/masters/emp-id-rule', { method: 'POST', body: JSON.stringify(r) }));
     } catch (e) {
       handleAdminApiError(e);
       throw e;
@@ -373,6 +381,7 @@ export default function FleetApp() {
             onBulkSaveDrivers={bulkSaveDrivers}
             onSaveCategory={saveMasterCategory}
             onSaveAll={saveAllMasters}
+            onSaveEmpIdRule={saveEmpIdRule}
             onRequestLogin={() => setShowAdminLogin(true)}
             onClearLogs={clearLogs}
           />

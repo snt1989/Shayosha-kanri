@@ -3,6 +3,8 @@ import path from 'path';
 import {
   AppData,
   DEFAULT_DRIVERS,
+  DEFAULT_EMP_ID_RULE,
+  EmpIdRule,
   DEFAULT_MASTERS,
   DEFAULT_VEHICLES,
   Masters,
@@ -22,6 +24,7 @@ function defaultData(): Omit<AppData, 'persistent'> {
   return {
     reports: [],
     reservations: [],
+    empIdRule: { ...DEFAULT_EMP_ID_RULE },
     // モジュール定数への参照をそのまま返すと、呼び出し側の push 等でこの
     // プロセスの「デフォルトデータ」自体が汚染されてしまうため、必ずコピーを返す。
     vehicles: DEFAULT_VEHICLES.map((v) => ({ ...v, maintHistory: [...v.maintHistory] })),
@@ -71,6 +74,7 @@ async function readLocal(): Promise<Omit<AppData, 'persistent'>> {
     return {
       reports: parsed.reports ?? [],
       reservations: parsed.reservations ?? [],
+      empIdRule: { ...DEFAULT_EMP_ID_RULE, ...(parsed.empIdRule ?? {}) },
       vehicles: parsed.vehicles ?? DEFAULT_VEHICLES.map((v) => ({ ...v, maintHistory: [...v.maintHistory] })),
       drivers: parsed.drivers ?? DEFAULT_DRIVERS.map((d) => ({ ...d })),
       masters: mergeMasters(parsed.masters),
@@ -100,6 +104,7 @@ export async function loadData(): Promise<AppData> {
     return {
       reports: raw.reports ?? [],
       reservations: raw.reservations ?? [],
+      empIdRule: { ...DEFAULT_EMP_ID_RULE, ...(raw.empIdRule ?? {}) },
       vehicles: raw.vehicles ?? DEFAULT_VEHICLES.map((v) => ({ ...v, maintHistory: [...v.maintHistory] })),
       drivers: raw.drivers ?? DEFAULT_DRIVERS.map((d) => ({ ...d })),
       masters: mergeMasters(raw.masters),
@@ -112,12 +117,14 @@ export async function loadData(): Promise<AppData> {
 }
 
 // reservations を渡さない呼び出し（日報・車両などの保存）では、保存済みの予約をそのまま引き継ぐ。
-type SaveInput = Omit<AppData, 'persistent' | 'reservations'> & { reservations?: Reservation[] };
+type SaveInput = Omit<AppData, 'persistent' | 'reservations' | 'empIdRule'> & { reservations?: Reservation[]; empIdRule?: EmpIdRule };
 
 export async function saveData(input: SaveInput): Promise<void> {
+  const existing = input.reservations && input.empIdRule ? null : await loadData();
   const data: Omit<AppData, 'persistent'> = {
     ...input,
-    reservations: input.reservations ?? (await loadData()).reservations,
+    reservations: input.reservations ?? existing?.reservations ?? [],
+    empIdRule: input.empIdRule ?? existing?.empIdRule ?? { ...DEFAULT_EMP_ID_RULE },
   };
   if (hasUpstash()) {
     const redis = await getRedis();
