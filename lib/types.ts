@@ -6,6 +6,7 @@ export type MaintRecord = {
   // 整備台帳で記録する任意項目（既存データには無いので optional）
   cost?: number;
   shop?: string;
+  by?: string; // 整備士としてログインして記録した人
 };
 
 export type Report = {
@@ -85,6 +86,7 @@ export const MASTER_KEYS = [
   'licenseTypes',
   'rentalCompanies',
   'rentalCarClasses',
+  'mechanics',
 ] as const;
 export type MasterKey = (typeof MASTER_KEYS)[number];
 export type Masters = Record<MasterKey, string[]>;
@@ -98,6 +100,7 @@ export const MASTER_LABELS: Record<MasterKey, string> = {
   licenseTypes: '免許種別',
   rentalCompanies: 'レンタカー会社',
   rentalCarClasses: 'レンタカー車種クラス',
+  mechanics: '整備士（整備台帳にログインできる人）',
 };
 
 export type LogEntry = {
@@ -193,6 +196,7 @@ export const DEFAULT_MASTERS: Masters = {
   licenseTypes: ['普通第一種', '準中型（5t限定含む）', '中型（8t限定含む）', '大型第一種', '第二種免許'],
   rentalCompanies: ['トヨタレンタカー', 'ニッポンレンタカー', 'オリックスレンタカー', 'タイムズカー', 'その他'],
   rentalCarClasses: ['軽自動車', 'コンパクト', 'セダン', 'ミニバン・ワゴン', 'SUV', 'トラック・バン', 'その他'],
+  mechanics: ['整備士 山本', '整備士 中村'],
 };
 
 export const DEFAULT_VEHICLES: Vehicle[] = [

@@ -7,6 +7,7 @@ import StatBar from './StatBar';
 import DashboardTab from './DashboardTab';
 import ReportsTab from './ReportsTab';
 import MaintenanceTab from './MaintenanceTab';
+import MechanicLoginModal from './MechanicLoginModal';
 import RentalTab from './RentalTab';
 import AdminTab from './AdminTab';
 import AdminLoginModal from './AdminLoginModal';
@@ -15,6 +16,7 @@ import DriverLoginModal from './DriverLoginModal';
 type Tab = 'dashboard' | 'reports' | 'maintenance' | 'rental' | 'admin';
 type SyncStatus = 'idle' | 'saving' | 'error';
 const DRIVER_SESSION_KEY = 'fleet_current_driver_id';
+const MECHANIC_SESSION_KEY = 'fleet_current_mechanic';
 
 async function jsonFetch(url: string, init?: RequestInit) {
   const res = await fetch(url, {
@@ -43,6 +45,8 @@ export default function FleetApp() {
   const [returnCheckinRequest, setReturnCheckinRequest] = useState<{ id: string; token: number } | null>(null);
   const [currentDriverId, setCurrentDriverId] = useState<string | null>(null);
   const [showDriverLogin, setShowDriverLogin] = useState(false);
+  const [mechanicName, setMechanicName] = useState<string | null>(null);
+  const [showMechanicLogin, setShowMechanicLogin] = useState(false);
   // 入力操作（出発登録・帰着登録・予約）の途中でログインを求めたときの案内と、ログイン後に続ける操作
   const [driverLoginNotice, setDriverLoginNotice] = useState<string | null>(null);
   const afterDriverLoginRef = useRef<(() => void) | null>(null);
@@ -53,6 +57,8 @@ export default function FleetApp() {
     try {
       const saved = localStorage.getItem(DRIVER_SESSION_KEY);
       if (saved) setCurrentDriverId(saved);
+      const m = localStorage.getItem(MECHANIC_SESSION_KEY);
+      if (m) setMechanicName(m);
     } catch {
       // ignore（プライベートブラウズ等でlocalStorageが使えない場合は無視）
     }
@@ -313,6 +319,24 @@ export default function FleetApp() {
     next?.();
   }
 
+  function handleSelectMechanic(name: string) {
+    setMechanicName(name);
+    setShowMechanicLogin(false);
+    try {
+      localStorage.setItem(MECHANIC_SESSION_KEY, name);
+    } catch {
+      // ignore
+    }
+  }
+  function handleMechanicLogout() {
+    setMechanicName(null);
+    try {
+      localStorage.removeItem(MECHANIC_SESSION_KEY);
+    } catch {
+      // ignore
+    }
+  }
+
   function handleDriverLogout() {
     setCurrentDriverId(null);
     try {
@@ -347,6 +371,8 @@ export default function FleetApp() {
     );
   }
 
+  // マスタから外された整備士のログインは無効にする
+  const activeMechanic = mechanicName && data.masters.mechanics.includes(mechanicName) ? mechanicName : null;
   const currentDriver = data.drivers.find((d) => d.id === currentDriverId) || null;
 
   return (
@@ -362,6 +388,9 @@ export default function FleetApp() {
         currentDriverName={currentDriver ? `${currentDriver.lastName} ${currentDriver.firstName}` : null}
         onOpenDriverLogin={openDriverLogin}
         onDriverLogout={handleDriverLogout}
+        mechanicName={activeMechanic}
+        onOpenMechanicLogin={() => setShowMechanicLogin(true)}
+        onMechanicLogout={handleMechanicLogout}
       />
 
       <div className="statbar">
@@ -395,7 +424,14 @@ export default function FleetApp() {
             onRequestLogin={() => setShowAdminLogin(true)}
           />
         )}
-        {tab === 'maintenance' && <MaintenanceTab data={data} onSave={saveVehicle} onResolveRequest={resolveMaintRequest} />}
+        {tab === 'maintenance' && <MaintenanceTab
+            data={data}
+            onSave={saveVehicle}
+            onResolveRequest={resolveMaintRequest}
+            mechanic={activeMechanic}
+            canEdit={Boolean(activeMechanic) || isAdmin}
+            onRequestMechanicLogin={() => setShowMechanicLogin(true)}
+          />}
         {tab === 'rental' && (
           <RentalTab
             data={data}
@@ -436,6 +472,14 @@ export default function FleetApp() {
         {!data.persistent && '（Upstash Redis が未設定のため、再デプロイでデータが消える可能性があります）'}
       </div>
 
+      {showMechanicLogin && (
+        <MechanicLoginModal
+          mechanics={data.masters.mechanics}
+          notice="整備台帳の記録・修正・削除、整備依頼への対応には、整備士としてのログイン（または管理者ログイン）が必要です。"
+          onClose={() => setShowMechanicLogin(false)}
+          onSelect={handleSelectMechanic}
+        />
+      )}
       {showAdminLogin && <AdminLoginModal onClose={() => setShowAdminLogin(false)} onLogin={handleAdminLogin} />}
       {showDriverLogin && (
         <DriverLoginModal

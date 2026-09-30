@@ -28,10 +28,18 @@ export default function MaintenanceTab({
   data,
   onSave,
   onResolveRequest,
+  mechanic,
+  canEdit,
+  onRequestMechanicLogin,
 }: {
   data: AppData;
   onSave: (v: Vehicle) => Promise<unknown>;
   onResolveRequest: (reportId: string, done: boolean) => Promise<unknown>;
+  // 整備士としてログイン中の名前（管理者だけのときは null）
+  mechanic: string | null;
+  // 記録の追加・修正・削除、依頼への対応ができるか（整備士または管理者のログイン）
+  canEdit: boolean;
+  onRequestMechanicLogin: () => void;
 }) {
   const [query, setQuery] = useState('');
   const [vehicleFilter, setVehicleFilter] = useState('');
@@ -76,6 +84,7 @@ export default function MaintenanceTab({
   const thisYearCount = rows.filter((r) => r.date.startsWith(thisYear)).length;
 
   function openNew() {
+    if (!canEdit) return onRequestMechanicLogin();
     const v = data.vehicles.find((x) => x.id === vehicleFilter) || data.vehicles[0];
     setEditing({
       vehicleId: v?.id || '',
@@ -85,6 +94,7 @@ export default function MaintenanceTab({
   }
   // 整備依頼を請けて、依頼の内容を引き継いだ整備記録の登録画面を開く
   function openFromRequest(r: Report) {
+    if (!canEdit) return onRequestMechanicLogin();
     const v = data.vehicles.find((x) => x.id === r.vehicleId);
     if (!v) return;
     setEditing({
@@ -102,13 +112,15 @@ export default function MaintenanceTab({
     });
   }
   async function closeRequestWithoutRecord(r: Report) {
+    if (!canEdit) return onRequestMechanicLogin();
     await onResolveRequest(r.id, true);
   }
   function openEdit(r: LedgerRow) {
+    if (!canEdit) return onRequestMechanicLogin();
     setEditing({
       vehicleId: r.vehicleId,
       index: r.index,
-      rec: { date: r.date, type: r.type, km: r.km, note: r.note, cost: r.cost, shop: r.shop || '' },
+      rec: { date: r.date, type: r.type, km: r.km, note: r.note, cost: r.cost, shop: r.shop || '', by: r.by },
     });
   }
 
@@ -141,6 +153,9 @@ export default function MaintenanceTab({
     };
     if (editing.rec.cost !== undefined && !Number.isNaN(editing.rec.cost)) rec.cost = editing.rec.cost;
     if (editing.rec.shop) rec.shop = editing.rec.shop;
+    // 記録した整備士。整備士としてログイン中ならその名前、編集のときは元の記録の名前を引き継ぐ
+    const by = mechanic || editing.rec.by || (canEdit ? '管理者' : '');
+    if (by) rec.by = by;
 
     const list = [...v.maintHistory];
     if (editing.index === null) list.unshift(rec);
@@ -157,6 +172,7 @@ export default function MaintenanceTab({
   }
 
   async function handleDelete(r: LedgerRow) {
+    if (!canEdit) return onRequestMechanicLogin();
     if (!confirm(`${r.date} ${r.vehicleName} の「${r.type}」を削除しますか？`)) return;
     const v = data.vehicles.find((x) => x.id === r.vehicleId);
     if (!v) return;
@@ -264,10 +280,21 @@ export default function MaintenanceTab({
               ⬇ 整備台帳CSV出力
             </button>
             <button className="btn btn-primary btn-sm" onClick={openNew} disabled={data.vehicles.length === 0}>
+              {canEdit ? '' : '🔒 '}
               ＋ 整備記録を追加
             </button>
           </div>
         </div>
+
+        {!canEdit && (
+          <div className="alert-item warn" style={{ margin: '4px 0 12px' }}>
+            <span>🔧</span>
+            <div style={{ flex: 1 }}>整備記録の追加・修正・削除と、整備依頼への対応は、整備士としてログインすると行えます。</div>
+            <button className="btn btn-sm btn-primary" onClick={onRequestMechanicLogin}>
+              整備士としてログイン
+            </button>
+          </div>
+        )}
 
         <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap', fontSize: 13, color: 'var(--slate-600)', margin: '4px 0 12px' }}>
           <span>
@@ -292,6 +319,7 @@ export default function MaintenanceTab({
                   <th>走行km</th>
                   <th>費用</th>
                   <th>実施先</th>
+                  <th>整備士</th>
                   <th>備考</th>
                   <th></th>
                 </tr>
@@ -310,13 +338,14 @@ export default function MaintenanceTab({
                     <td>{r.km.toLocaleString()}</td>
                     <td>{yen(r.cost)}</td>
                     <td>{r.shop || '-'}</td>
+                    <td>{r.by || '-'}</td>
                     <td>{r.note}</td>
                     <td style={{ whiteSpace: 'nowrap' }}>
                       <button className="btn btn-sm" onClick={() => openEdit(r)}>
-                        編集
+                        {canEdit ? '' : '🔒 '}編集
                       </button>{' '}
                       <button className="btn btn-sm btn-danger" onClick={() => handleDelete(r)}>
-                        削除
+                        {canEdit ? '' : '🔒 '}削除
                       </button>
                     </td>
                   </tr>

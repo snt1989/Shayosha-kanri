@@ -50,6 +50,7 @@ function mergeMasters(masters: Partial<Masters> | undefined): Masters {
     licenseTypes: masters.licenseTypes ?? base.licenseTypes,
     rentalCompanies: masters.rentalCompanies ?? base.rentalCompanies,
     rentalCarClasses: masters.rentalCarClasses ?? base.rentalCarClasses,
+    mechanics: masters.mechanics ?? base.mechanics,
   };
 }
 

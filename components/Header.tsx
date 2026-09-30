@@ -22,6 +22,9 @@ export default function Header({
   currentDriverName,
   onOpenDriverLogin,
   onDriverLogout,
+  mechanicName,
+  onOpenMechanicLogin,
+  onMechanicLogout,
 }: {
   tab: Tab;
   onTabChange: (t: Tab) => void;
@@ -33,6 +36,9 @@ export default function Header({
   currentDriverName?: string | null;
   onOpenDriverLogin: () => void;
   onDriverLogout: () => void;
+  mechanicName?: string | null;
+  onOpenMechanicLogin: () => void;
+  onMechanicLogout: () => void;
 }) {
   const syncLabel = syncStatus === 'saving' ? '同期中…' : syncStatus === 'error' ? '同期エラー' : '同期完了';
   const syncCls = syncStatus === 'saving' ? 'saving' : syncStatus === 'error' ? 'error' : 'ok';
@@ -83,6 +89,21 @@ export default function Header({
           ) : (
             <button className="btn btn-sm" onClick={onOpenDriverLogin}>
               🪪 運転者としてログイン
+            </button>
+          )}
+          {mechanicName ? (
+            <button
+              className="btn btn-sm"
+              onClick={() => {
+                if (confirm(`${mechanicName} さんの整備士ログインを解除しますか？`)) onMechanicLogout();
+              }}
+              title="別の整備士に切り替える／ログアウト"
+            >
+              🔧 {mechanicName}
+            </button>
+          ) : (
+            <button className="btn btn-sm" onClick={onOpenMechanicLogin}>
+              🔧 整備士としてログイン
             </button>
           )}
           {isAdmin ? (
