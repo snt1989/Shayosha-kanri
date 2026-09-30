@@ -10,9 +10,11 @@ import VehiclesTab from './VehiclesTab';
 import DriversTab from './DriversTab';
 import AdminTab from './AdminTab';
 import AdminLoginModal from './AdminLoginModal';
+import DriverLoginModal from './DriverLoginModal';
 
 type Tab = 'dashboard' | 'reports' | 'vehicles' | 'drivers' | 'admin';
 type SyncStatus = 'idle' | 'saving' | 'error';
+const DRIVER_SESSION_KEY = 'fleet_current_driver_id';
 
 async function jsonFetch(url: string, init?: RequestInit) {
   const res = await fetch(url, {
@@ -39,10 +41,18 @@ export default function FleetApp() {
   const [showAdminLogin, setShowAdminLogin] = useState(false);
   const [quickReportTrigger, setQuickReportTrigger] = useState<number | null>(null);
   const [returnCheckinRequest, setReturnCheckinRequest] = useState<{ id: string; token: number } | null>(null);
+  const [currentDriverId, setCurrentDriverId] = useState<string | null>(null);
+  const [showDriverLogin, setShowDriverLogin] = useState(false);
 
   useEffect(() => {
     load();
     checkAdminSession();
+    try {
+      const saved = localStorage.getItem(DRIVER_SESSION_KEY);
+      if (saved) setCurrentDriverId(saved);
+    } catch {
+      // ignore（プライベートブラウズ等でlocalStorageが使えない場合は無視）
+    }
   }, []);
 
   async function load() {
@@ -200,6 +210,25 @@ export default function FleetApp() {
     setReturnCheckinRequest(null);
   }
 
+  function handleSelectDriver(driver: Driver) {
+    setCurrentDriverId(driver.id);
+    setShowDriverLogin(false);
+    try {
+      localStorage.setItem(DRIVER_SESSION_KEY, driver.id);
+    } catch {
+      // ignore
+    }
+  }
+
+  function handleDriverLogout() {
+    setCurrentDriverId(null);
+    try {
+      localStorage.removeItem(DRIVER_SESSION_KEY);
+    } catch {
+      // ignore
+    }
+  }
+
   if (loading) {
     return (
       <div className="app-shell">
@@ -225,6 +254,8 @@ export default function FleetApp() {
     );
   }
 
+  const currentDriver = data.drivers.find((d) => d.id === currentDriverId) || null;
+
   return (
     <div className="app-shell">
       <Header
@@ -235,6 +266,9 @@ export default function FleetApp() {
         onOpenAdminLogin={() => setShowAdminLogin(true)}
         onLogoutAdmin={handleAdminLogout}
         onQuickReport={handleQuickReport}
+        currentDriverName={currentDriver ? `${currentDriver.lastName} ${currentDriver.firstName}` : null}
+        onOpenDriverLogin={() => setShowDriverLogin(true)}
+        onDriverLogout={handleDriverLogout}
       />
 
       <div className="statbar">
@@ -253,6 +287,7 @@ export default function FleetApp() {
             onQuickReportHandled={handleQuickReportHandled}
             returnCheckinRequest={returnCheckinRequest}
             onReturnCheckinHandled={handleReturnCheckinHandled}
+            currentDriver={currentDriver}
             isAdmin={isAdmin}
             onRequestLogin={() => setShowAdminLogin(true)}
           />
@@ -282,6 +317,9 @@ export default function FleetApp() {
       </div>
 
       {showAdminLogin && <AdminLoginModal onClose={() => setShowAdminLogin(false)} onLogin={handleAdminLogin} />}
+      {showDriverLogin && (
+        <DriverLoginModal drivers={data.drivers} onClose={() => setShowDriverLogin(false)} onSelect={handleSelectDriver} />
+      )}
     </div>
   );
 }

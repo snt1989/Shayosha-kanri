@@ -7,14 +7,14 @@ import { downloadCsv } from '@/lib/csv';
 import { extractOdometerReading, loadTesseract } from '@/lib/ocr';
 import Modal from './Modal';
 
-const emptyReport = (data: AppData): Report => ({
+const emptyReport = (data: AppData, currentDriver?: Driver | null): Report => ({
   id: '',
   date: todayStr(),
-  dept: data.masters.departments[0] || '',
-  driverId: '',
-  driverLast: '',
-  driverFirst: '',
-  driver: '',
+  dept: currentDriver?.dept || data.masters.departments[0] || '',
+  driverId: currentDriver?.id || '',
+  driverLast: currentDriver?.lastName || '',
+  driverFirst: currentDriver?.firstName || '',
+  driver: currentDriver ? `${currentDriver.lastName} ${currentDriver.firstName}`.trim() : '',
   vehicleId: '',
   vehicleName: '',
   plate: '',
@@ -87,6 +87,7 @@ export default function ReportsTab({
   onQuickReportHandled,
   returnCheckinRequest,
   onReturnCheckinHandled,
+  currentDriver,
   isAdmin,
   onRequestLogin,
 }: {
@@ -98,6 +99,7 @@ export default function ReportsTab({
   onQuickReportHandled?: () => void;
   returnCheckinRequest?: { id: string; token: number } | null;
   onReturnCheckinHandled?: () => void;
+  currentDriver?: Driver | null;
   isAdmin: boolean;
   onRequestLogin: () => void;
 }) {
@@ -118,7 +120,7 @@ export default function ReportsTab({
   // 存在する限り毎回確実に開く。
   useEffect(() => {
     if (openTrigger != null) {
-      setEditing(emptyReport(data));
+      setEditing(emptyReport(data, currentDriver));
       onQuickReportHandled?.();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -149,7 +151,7 @@ export default function ReportsTab({
   }, [data.reports]);
 
   function openNew() {
-    setEditing(emptyReport(data));
+    setEditing(emptyReport(data, currentDriver));
   }
   function openEdit(r: Report) {
     if (!isAdmin) {

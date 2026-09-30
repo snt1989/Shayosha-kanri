@@ -19,6 +19,9 @@ export default function Header({
   onOpenAdminLogin,
   onLogoutAdmin,
   onQuickReport,
+  currentDriverName,
+  onOpenDriverLogin,
+  onDriverLogout,
 }: {
   tab: Tab;
   onTabChange: (t: Tab) => void;
@@ -27,6 +30,9 @@ export default function Header({
   onOpenAdminLogin: () => void;
   onLogoutAdmin: () => void;
   onQuickReport: () => void;
+  currentDriverName?: string | null;
+  onOpenDriverLogin: () => void;
+  onDriverLogout: () => void;
 }) {
   const syncLabel = syncStatus === 'saving' ? '同期中…' : syncStatus === 'error' ? '同期エラー' : '同期完了';
   const syncCls = syncStatus === 'saving' ? 'saving' : syncStatus === 'error' ? 'error' : 'ok';
@@ -64,6 +70,21 @@ export default function Header({
             <span className="dot" />
             {syncLabel}
           </span>
+          {currentDriverName ? (
+            <button
+              className="btn btn-sm"
+              onClick={() => {
+                if (confirm(`${currentDriverName} さんのログインを解除しますか？`)) onDriverLogout();
+              }}
+              title="別の運転者に切り替える／ログアウト"
+            >
+              🪪 {currentDriverName} さん
+            </button>
+          ) : (
+            <button className="btn btn-sm" onClick={onOpenDriverLogin}>
+              🪪 運転者としてログイン
+            </button>
+          )}
           {isAdmin ? (
             <button className="btn btn-sm" onClick={onLogoutAdmin}>
               🔓 管理者ログアウト
