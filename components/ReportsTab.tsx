@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { AppData, Driver, Report } from '@/lib/types';
 import { genId, nowTimeStr, todayStr } from '@/lib/utils';
 import { downloadCsv } from '@/lib/csv';
+import { extractOdometerReading, loadTesseract } from '@/lib/ocr';
 import Modal from './Modal';
 
 const emptyReport = (data: AppData): Report => ({
@@ -106,6 +107,9 @@ export default function ReportsTab({
   const [quickDriver, setQuickDriver] = useState<Driver | null>(null);
   const [savingDriver, setSavingDriver] = useState(false);
   const photoInputRef = useRef<HTMLInputElement>(null);
+  const meterPhotoInputRef = useRef<HTMLInputElement>(null);
+  const [meterOcrTarget, setMeterOcrTarget] = useState<'startKm' | 'endKm' | null>(null);
+  const [meterOcrRunning, setMeterOcrRunning] = useState(false);
 
   // openTrigger/returnCheckinRequest はタブ切替と同時に発火するため、このコンポーネント
   // 自体が新規マウントされるケースがある（親のrefベースの前回値比較だと、マウント時に
@@ -205,6 +209,40 @@ export default function ReportsTab({
     if (!editing || !file) return;
     const reader = new FileReader();
     reader.onload = () => setEditing((cur) => (cur ? { ...cur, inspectionPhoto: String(reader.result) } : cur));
+    reader.readAsDataURL(file);
+  }
+
+  function triggerMeterCamera(target: 'startKm' | 'endKm') {
+    setMeterOcrTarget(target);
+    meterPhotoInputRef.current?.click();
+  }
+
+  function handleMeterPhotoFile(file: File | null) {
+    const target = meterOcrTarget;
+    if (!file || !target) return;
+    const reader = new FileReader();
+    reader.onload = async () => {
+      const photo = String(reader.result);
+      setMeterOcrRunning(true);
+      try {
+        const Tesseract = await loadTesseract();
+        const res = await Tesseract.recognize(photo, 'eng', {
+          tessedit_char_whitelist: '0123456789.',
+        });
+        const text = res?.data?.text || '';
+        const reading = extractOdometerReading(text);
+        if (reading === null) {
+          alert('メーターの数値を読み取れませんでした。手入力してください。');
+        } else {
+          setEditing((cur) => (cur ? { ...cur, [target]: reading } : cur));
+        }
+      } catch {
+        alert('OCR処理に失敗しました。手入力してください。');
+      } finally {
+        setMeterOcrRunning(false);
+        setMeterOcrTarget(null);
+      }
+    };
     reader.readAsDataURL(file);
   }
 
@@ -494,7 +532,22 @@ export default function ReportsTab({
 
           <div className="field">
             <label>出発時メーター（km） *</label>
-            <input type="number" value={editing.startKm} onChange={(e) => setEditing({ ...editing, startKm: Number(e.target.value) })} />
+            <div style={{ display: 'flex', gap: 6 }}>
+              <input
+                type="number"
+                value={editing.startKm}
+                onChange={(e) => setEditing({ ...editing, startKm: Number(e.target.value) })}
+                style={{ flex: 1 }}
+              />
+              <button
+                type="button"
+                className="btn btn-sm"
+                onClick={() => triggerMeterCamera('startKm')}
+                disabled={meterOcrRunning}
+              >
+                {meterOcrRunning && meterOcrTarget === 'startKm' ? '解析中…' : '📷 撮影して自動入力'}
+              </button>
+            </div>
           </div>
           <div className="field">
             <label>点検写真（任意）</label>
@@ -573,10 +626,37 @@ export default function ReportsTab({
               </div>
               <div className="field">
                 <label>帰着時 走行距離（km）</label>
-                <input type="number" value={editing.endKm} onChange={(e) => setEditing({ ...editing, endKm: Number(e.target.value) })} />
+                <div style={{ display: 'flex', gap: 6 }}>
+                  <input
+                    type="number"
+                    value={editing.endKm}
+                    onChange={(e) => setEditing({ ...editing, endKm: Number(e.target.value) })}
+                    style={{ flex: 1 }}
+                  />
+                  <button
+                    type="button"
+                    className="btn btn-sm"
+                    onClick={() => triggerMeterCamera('endKm')}
+                    disabled={meterOcrRunning}
+                  >
+                    {meterOcrRunning && meterOcrTarget === 'endKm' ? '解析中…' : '📷 撮影して自動入力'}
+                  </button>
+                </div>
               </div>
             </>
           )}
+
+          <input
+            ref={meterPhotoInputRef}
+            type="file"
+            accept="image/*"
+            capture="environment"
+            hidden
+            onChange={(e) => {
+              handleMeterPhotoFile(e.target.files?.[0] || null);
+              e.target.value = '';
+            }}
+          />
 
           <div className="field">
             <label>特記事項</label>

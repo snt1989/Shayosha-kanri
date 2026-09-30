@@ -3,36 +3,8 @@
 import { useRef, useState } from 'react';
 import { AppData, Driver } from '@/lib/types';
 import { genId } from '@/lib/utils';
+import { loadTesseract } from '@/lib/ocr';
 import Modal from './Modal';
-
-declare global {
-  interface Window {
-    Tesseract?: any;
-  }
-}
-
-const TESSERACT_SRC = 'https://cdn.jsdelivr.net/npm/tesseract.js@5.1.1/dist/tesseract.min.js';
-
-function loadTesseract(): Promise<any> {
-  return new Promise((resolve, reject) => {
-    if (window.Tesseract) {
-      resolve(window.Tesseract);
-      return;
-    }
-    const existing = document.querySelector(`script[src="${TESSERACT_SRC}"]`);
-    if (existing) {
-      existing.addEventListener('load', () => resolve(window.Tesseract));
-      existing.addEventListener('error', () => reject(new Error('load failed')));
-      return;
-    }
-    const script = document.createElement('script');
-    script.src = TESSERACT_SRC;
-    script.async = true;
-    script.onload = () => resolve(window.Tesseract);
-    script.onerror = () => reject(new Error('load failed'));
-    document.head.appendChild(script);
-  });
-}
 
 function extractFields(text: string) {
   const result: Partial<Driver> = {};
