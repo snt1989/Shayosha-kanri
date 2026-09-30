@@ -158,6 +158,8 @@ export type RentalTrip = {
   date: string; // 運転した日
   driverId?: string; // 運転者台帳の人。台帳外の人は未設定
   driver: string;
+  dept?: string; // 事業部
+  site?: string; // 現場名
   note: string; // 区間・用件など（任意）
   createdAt: string;
 };

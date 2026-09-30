@@ -223,10 +223,10 @@ export function rentalsToCsv(list: Rental[]): string {
 
 export function rentalTripsToCsv(trips: RentalTrip[], rentals: Rental[]): string {
   const byId = new Map(rentals.map((r) => [r.id, r]));
-  const rows: (string | number)[][] = [['運転日', '運転者', 'レンタカー会社', '車種', 'ナンバー', '備考']];
+  const rows: (string | number)[][] = [['運転日', '運転者', '事業部', '現場名', 'レンタカー会社', '車種', 'ナンバー', '備考']];
   trips.forEach((t) => {
     const r = byId.get(t.rentalId);
-    rows.push([t.date, t.driver, r?.company || '', r?.carModel || '', r?.plate || '', t.note]);
+    rows.push([t.date, t.driver, t.dept || '', t.site || '', r?.company || '', r?.carModel || '', r?.plate || '', t.note]);
   });
   return toCsv(rows);
 }

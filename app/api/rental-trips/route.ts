@@ -24,6 +24,11 @@ export async function POST(req: NextRequest) {
   if (!rental) {
     return NextResponse.json({ success: false, message: '対象のレンタカーが見つかりません。' }, { status: 404 });
   }
+  t.dept = String(t.dept || '').trim();
+  t.site = String(t.site || '').trim();
+  if (!t.site || !t.dept) {
+    return NextResponse.json({ success: false, message: '現場名と事業部は必須です。' }, { status: 400 });
+  }
   t.note = t.note || '';
   t.createdAt = t.createdAt || new Date().toISOString();
 
@@ -35,7 +40,7 @@ export async function POST(req: NextRequest) {
     actor: isAdminReq ? 'admin' : 'user',
     action: isNew || idx < 0 ? 'レンタカー運行記録登録' : 'レンタカー運行記録更新',
     target: `${t.date} ${t.driver} / ${rental.company} ${rental.carModel || ''}`.trim(),
-    detail: t.note || undefined,
+    detail: [t.dept, t.site, t.note].filter(Boolean).join(' / ') || undefined,
   });
 
   await saveData({

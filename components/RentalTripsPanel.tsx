@@ -11,7 +11,7 @@ const OTHER = '__other__';
 type Draft = { rec: RentalTrip; pick: string };
 
 // 運転日・運転者・備考の入力欄（入力画面と編集モーダルで共通）
-function TripFields({ draft, onChange, drivers }: { draft: Draft; onChange: (d: Draft) => void; drivers: Driver[] }) {
+function TripFields({ draft, onChange, drivers, departments }: { draft: Draft; onChange: (d: Draft) => void; drivers: Driver[]; departments: string[] }) {
   const { rec, pick } = draft;
   const picked = drivers.find((d) => d.id === pick);
   const days = picked ? daysUntil(picked.licenseExpiry) : null;
@@ -27,7 +27,8 @@ function TripFields({ draft, onChange, drivers }: { draft: Draft; onChange: (d: 
   function pickDriver(v: string) {
     if (v === OTHER) return onChange({ pick: v, rec: { ...rec, driverId: undefined, driver: '' } });
     const d = drivers.find((x) => x.id === v);
-    onChange({ pick: v, rec: { ...rec, driverId: v, driver: d ? `${d.lastName} ${d.firstName}` : '' } });
+    // 運転者を選んだら、その人の所属を事業部の初期値にする（変更もできる）
+    onChange({ pick: v, rec: { ...rec, driverId: v, driver: d ? `${d.lastName} ${d.firstName}` : '', dept: d?.dept || rec.dept } });
   }
   return (
     <>
@@ -59,6 +60,21 @@ function TripFields({ draft, onChange, drivers }: { draft: Draft; onChange: (d: 
           {licenseMsg}
         </div>
       )}
+      <div className="field-row">
+        <div className="field">
+          <label>事業部</label>
+          <select value={rec.dept || ''} onChange={(e) => onChange({ pick, rec: { ...rec, dept: e.target.value } })}>
+            <option value="">選択してください</option>
+            {Array.from(new Set([...departments, rec.dept].filter(Boolean) as string[])).map((d) => (
+              <option key={d} value={d}>{d}</option>
+            ))}
+          </select>
+        </div>
+        <div className="field">
+          <label>現場名</label>
+          <input value={rec.site || ''} placeholder="例: ○○ビル新築工事" onChange={(e) => onChange({ pick, rec: { ...rec, site: e.target.value } })} />
+        </div>
+      </div>
       <div className="field">
         <label>備考（区間・用件など、任意）</label>
         <input value={rec.note} onChange={(e) => onChange({ pick, rec: { ...rec, note: e.target.value } })} />
@@ -121,6 +137,8 @@ export default function RentalTripsPanel({
       date,
       driverId: currentDriver?.id,
       driver: currentDriver ? `${currentDriver.lastName} ${currentDriver.firstName}` : '',
+      dept: currentDriver?.dept || '',
+      site: '',
       note: '',
       createdAt: '',
     },
@@ -170,6 +188,14 @@ export default function RentalTripsPanel({
       setError('運転者を選ぶか、名前を入力してください。');
       return false;
     }
+    if (!(rec.dept || '').trim()) {
+      setError('事業部を選んでください。');
+      return false;
+    }
+    if (!(rec.site || '').trim()) {
+      setError('現場名を入力してください。');
+      return false;
+    }
     setSaving(true);
     setError('');
     setOkMsg('');
@@ -190,7 +216,9 @@ export default function RentalTripsPanel({
     if (!(await save(entry))) return;
     // 続けて入力できるよう、運転日は残して運転者・備考を初期化する
     setOkMsg(`${entry.rec.date} ${entry.rec.driver} を登録しました。`);
-    setDraft(blankDraft(entry.rec.rentalId, entry.rec.date));
+    // 同じ現場が続くことが多いので、運転日・事業部・現場名は残す
+    const next = blankDraft(entry.rec.rentalId, entry.rec.date);
+    setDraft({ ...next, rec: { ...next.rec, dept: entry.rec.dept, site: entry.rec.site } });
   }
 
   return (
@@ -254,7 +282,7 @@ export default function RentalTripsPanel({
                 {error}
               </div>
             )}
-            <TripFields draft={entry} onChange={setDraft} drivers={data.drivers} />
+            <TripFields draft={entry} onChange={setDraft} drivers={data.drivers} departments={data.masters.departments} />
             <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
               <button className="btn btn-primary" onClick={submitInline} disabled={saving}>
                 {saving ? '保存中…' : '登録する'}
@@ -305,6 +333,8 @@ export default function RentalTripsPanel({
                     <tr>
                       <th>運転日</th>
                       <th>運転者</th>
+                      <th>事業部</th>
+                      <th>現場名</th>
                       {!focused && <th>レンタカー</th>}
                       <th>備考</th>
                       <th>操作</th>
@@ -318,6 +348,8 @@ export default function RentalTripsPanel({
                           {t.driver}
                           {!t.driverId && <span className="cell-sub">台帳外</span>}
                         </td>
+                        <td>{t.dept || '-'}</td>
+                        <td>{t.site || '-'}</td>
                         {!focused && <td>{rentalLabel(t.rentalId)}</td>}
                         <td>{t.note || '-'}</td>
                         <td>
@@ -370,7 +402,7 @@ export default function RentalTripsPanel({
               ))}
             </select>
           </div>
-          <TripFields draft={form} onChange={setForm} drivers={data.drivers} />
+          <TripFields draft={form} onChange={setForm} drivers={data.drivers} departments={data.masters.departments} />
         </Modal>
       )}
     </div>
