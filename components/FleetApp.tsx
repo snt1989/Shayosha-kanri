@@ -349,7 +349,15 @@ export default function FleetApp() {
 
       {showAdminLogin && <AdminLoginModal onClose={() => setShowAdminLogin(false)} onLogin={handleAdminLogin} />}
       {showDriverLogin && (
-        <DriverLoginModal drivers={data.drivers} onClose={() => setShowDriverLogin(false)} onSelect={handleSelectDriver} />
+        <DriverLoginModal
+          data={data}
+          onClose={() => setShowDriverLogin(false)}
+          onSelect={handleSelectDriver}
+          onRegister={async (d) => {
+            await saveDriver(d);
+            handleSelectDriver(d);
+          }}
+        />
       )}
     </div>
   );

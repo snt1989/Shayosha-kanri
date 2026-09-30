@@ -5,7 +5,6 @@ import { AppData, Driver } from '@/lib/types';
 import { daysUntil, todayStr } from '@/lib/utils';
 import { csvToDrivers, downloadCsv, driversToCsv } from '@/lib/csv';
 import Modal from './Modal';
-import DriverOcrModal from './DriverOcrModal';
 
 const emptyDriver = (data: AppData): Driver => ({
   id: '',
@@ -34,7 +33,6 @@ export default function DriversTab({
   const [query, setQuery] = useState('');
   const [editing, setEditing] = useState<Driver | null>(null);
   const [saving, setSaving] = useState(false);
-  const [showOcr, setShowOcr] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
 
   const filtered = useMemo(() => {
@@ -123,9 +121,6 @@ export default function DriversTab({
               onChange={(e) => setQuery(e.target.value)}
               style={{ padding: '9px 12px', border: '1px solid var(--slate-300)', borderRadius: 8, minWidth: 180 }}
             />
-            <button className="btn btn-sm" style={{ background: 'var(--green-50)', borderColor: 'var(--green-100)', color: 'var(--green-600)' }} onClick={() => setShowOcr(true)}>
-              📷 免許証写真で自動登録（本人登録）
-            </button>
             <button className="btn btn-sm" onClick={openNew}>
               手入力で登録
             </button>
@@ -256,7 +251,6 @@ export default function DriversTab({
         </Modal>
       )}
 
-      {showOcr && <DriverOcrModal data={data} onClose={() => setShowOcr(false)} onSave={onSave} />}
     </div>
   );
 }
