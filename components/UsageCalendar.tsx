@@ -1,7 +1,7 @@
 'use client';
 
 import { useMemo, useState } from 'react';
-import { AppData, Driver, Report, Reservation } from '@/lib/types';
+import { AppData, Driver, Rental, Report, Reservation } from '@/lib/types';
 import { todayStr } from '@/lib/utils';
 import Modal from './Modal';
 
@@ -30,7 +30,15 @@ const rangeLabel = (v: Reservation) =>
   v.startDate === v.endDate ? `${md(v.startDate)} ${v.startTime}〜${v.endTime}` : `${md(v.startDate)} ${v.startTime}〜${md(v.endDate)} ${v.endTime}`;
 
 // 日ごとの表示項目: 日報（使用実績）と予約
-type Entry = { kind: 'report'; time: string; r: Report } | { kind: 'reservation'; time: string; v: Reservation };
+type Entry =
+  | { kind: 'report'; time: string; r: Report }
+  | { kind: 'reservation'; time: string; v: Reservation }
+  | { kind: 'rental'; time: string; n: Rental };
+
+// レンタカーは車両ではないので専用の色にする
+const RENTAL_COLOR = { bg: '#ffedd5', fg: '#c2410c' };
+const RENTAL_FILTER = '__rental__';
+const rentalName = (n: Rental) => [n.company, n.carModel].filter(Boolean).join(' ');
 
 const newReservation = (date: string, vehicleId: string, driver?: Driver | null): Reservation => ({
   id: '',
@@ -97,9 +105,19 @@ export default function UsageCalendar({
         d = addDays(d, 1);
       }
     });
+    // レンタカー: 登録している間だけ、利用期間の各日に表示する（車両での絞り込み中は出さない）
+    if (!vehicleId || vehicleId === RENTAL_FILTER) {
+      (data.rentals || []).forEach((n) => {
+        let d = n.startDate;
+        for (let i = 0; d <= (n.endDate || n.startDate) && i < 62; i++) {
+          push(d, { kind: 'rental', time: '00:00', n });
+          d = addDays(d, 1);
+        }
+      });
+    }
     map.forEach((list) => list.sort((a, b) => a.time.localeCompare(b.time)));
     return map;
-  }, [data.reports, data.reservations, vehicleId]);
+  }, [data.reports, data.reservations, data.rentals, vehicleId]);
 
   const [y, m] = month.split('-').map(Number);
   const cells = useMemo(() => {
@@ -117,11 +135,16 @@ export default function UsageCalendar({
   const monthCounts = useMemo(() => {
     let use = 0;
     const reserved = new Set<string>();
+    const rented = new Set<string>();
     byDate.forEach((list, d) => {
       if (!d.startsWith(month)) return;
-      list.forEach((e) => (e.kind === 'report' ? use++ : reserved.add(e.v.id)));
+      list.forEach((e) => {
+        if (e.kind === 'report') use++;
+        else if (e.kind === 'reservation') reserved.add(e.v.id);
+        else rented.add(e.n.id);
+      });
     });
-    return { use, res: reserved.size };
+    return { use, res: reserved.size, rent: rented.size };
   }, [byDate, month]);
   const dayEntries = byDate.get(selected) || [];
 
@@ -201,10 +224,10 @@ export default function UsageCalendar({
           <h3 className="card-title" style={{ marginBottom: 4 }}>
             📅 車両の使用・予約カレンダー
             <span className="pill pill-slate" style={{ marginLeft: 8 }}>
-              {y}年{m}月　使用{monthCounts.use}件・予約{monthCounts.res}件
+              {y}年{m}月　使用{monthCounts.use}件・予約{monthCounts.res}件・レンタカー{monthCounts.rent}件
             </span>
           </h3>
-          <div style={{ fontSize: 12, color: 'var(--slate-500)' }}>日報の使用実績と車両の予約を月単位で確認できます。日付を押すと詳細が表示されます。同じ車両の時間が重なる予約はできません。</div>
+          <div style={{ fontSize: 12, color: 'var(--slate-500)' }}>日報の使用実績、車両の予約、登録中のレンタカーを月単位で確認できます。日付を押すと詳細が表示されます。同じ車両の時間が重なる予約はできません。</div>
         </div>
         <div className="actions">
           <button className="btn btn-sm btn-primary" onClick={() => openNewReservation(selected)} disabled={data.vehicles.length === 0}>
@@ -231,12 +254,13 @@ export default function UsageCalendar({
             onChange={(e) => setVehicleId(e.target.value)}
             style={{ padding: '7px 10px', border: '1px solid var(--slate-300)', borderRadius: 8 }}
           >
-            <option value="">すべての車両</option>
+            <option value="">すべての車両・レンタカー</option>
             {data.vehicles.map((v) => (
               <option key={v.id} value={v.id}>
                 {v.name}
               </option>
             ))}
+            <option value={RENTAL_FILTER}>レンタカーのみ</option>
           </select>
         </div>
       </div>
@@ -250,6 +274,9 @@ export default function UsageCalendar({
             </span>
           );
         })}
+        <span className="cal-chip" style={{ background: RENTAL_COLOR.bg, color: RENTAL_COLOR.fg }}>
+          🚗 レンタカー
+        </span>
         <span className="cal-legend-note">実線＝使用実績（日報）／破線の「予」＝予約</span>
       </div>
 
@@ -286,6 +313,19 @@ export default function UsageCalendar({
                         title={`${r.preTime} ${r.vehicleName} / ${r.driver} / ${r.destination}`}
                       >
                         {shortName(r.vehicleName)} {r.driverLast}
+                      </span>
+                    );
+                  }
+                  if (e.kind === 'rental') {
+                    const n = e.n;
+                    return (
+                      <span
+                        key={`${n.id}-${key}`}
+                        className="cal-chip"
+                        style={{ background: RENTAL_COLOR.bg, color: RENTAL_COLOR.fg }}
+                        title={`【レンタカー】${n.startDate}〜${n.endDate} ${rentalName(n)} ${n.plate}`}
+                      >
+                        🚗 {rentalName(n)}
                       </span>
                     );
                   }
@@ -344,6 +384,26 @@ export default function UsageCalendar({
                       </div>
                     </div>
                     {r.postDone ? <span className="pill pill-green">帰着済</span> : <span className="pill pill-amber">出庫中</span>}
+                  </div>
+                );
+              }
+              if (e.kind === 'rental') {
+                const n = e.n;
+                const drivers = Array.from(new Set(data.rentalTrips.filter((t) => t.rentalId === n.id && t.date === selected).map((t) => t.driver)));
+                return (
+                  <div key={`${n.id}-${selected}`} className="alert-item" style={plain}>
+                    <span className="cal-chip" style={{ background: RENTAL_COLOR.bg, color: RENTAL_COLOR.fg }}>
+                      🚗 レンタカー
+                    </span>
+                    <div style={{ flex: 1 }}>
+                      <strong>{rentalName(n)}</strong>
+                      {n.carClass ? ` / ${n.carClass}` : ''}
+                      <div style={{ fontSize: 12, color: 'var(--slate-500)' }}>
+                        {md(n.startDate)}〜{md(n.endDate)}
+                        {n.plate ? `　${n.plate}` : ''}　登録者: {n.driver}
+                        {drivers.length > 0 ? `　この日の運転者: ${drivers.join('・')}` : ''}
+                      </div>
+                    </div>
                   </div>
                 );
               }

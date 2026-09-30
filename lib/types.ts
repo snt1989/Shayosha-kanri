@@ -142,7 +142,6 @@ export type Rental = {
   startDate: string;
   endDate: string;
   cost: number; // 料金（円）
-  damageNote: string; // 傷・事故等の申告
   notes: string;
   createdAt: string;
 };

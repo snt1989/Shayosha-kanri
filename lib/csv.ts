@@ -211,12 +211,12 @@ export function downloadJson(filename: string, data: unknown) {
 }
 
 /* ---------- rentals ---------- */
-const RENTAL_HEADERS = ['利用開始日', '返却日', 'レンタカー会社', '車種クラス', '車種', 'ナンバー', '予約番号', '登録者', '部署', '料金', '傷・事故の申告', '備考'];
+const RENTAL_HEADERS = ['利用開始日', '返却日', 'レンタカー会社', '車種クラス', '車種', 'ナンバー', '予約番号', '登録者', '部署', '料金', '備考'];
 
 export function rentalsToCsv(list: Rental[]): string {
   const rows: (string | number)[][] = [RENTAL_HEADERS];
   list.forEach((r) => {
-    rows.push([r.startDate, r.endDate, r.company, r.carClass, r.carModel, r.plate, r.reservationNo, r.driver, r.dept, r.cost || '', r.damageNote, r.notes]);
+    rows.push([r.startDate, r.endDate, r.company, r.carClass, r.carModel, r.plate, r.reservationNo, r.driver, r.dept, r.cost || '', r.notes]);
   });
   return toCsv(rows);
 }

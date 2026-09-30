@@ -22,7 +22,6 @@ const emptyRental = (data: AppData, d: Driver | null): Rental => ({
   startDate: todayStr(),
   endDate: todayStr(),
   cost: 0,
-  damageNote: '',
   notes: '',
   createdAt: '',
 });
@@ -134,7 +133,7 @@ export default function RentalTab({
               🚗 レンタカー登録 <span className="pill pill-slate">社用車とは別管理</span>
             </h3>
             <div style={{ fontSize: 12, color: 'var(--slate-500)' }}>
-              借りたレンタカーと料金を登録します。誰が運転したかは「運行記録」で別に管理します。
+              借りたレンタカーと料金を登録します。登録したレンタカーを押すと、運転した人を記録する「運行記録」の入力画面に切り替わります。
             </div>
           </div>
           <div className="actions">
@@ -194,7 +193,15 @@ export default function RentalTab({
               </thead>
               <tbody>
                 {rows.map((r) => (
-                  <tr key={r.id}>
+                  <tr
+                    key={r.id}
+                    onClick={() => {
+                      setTripRentalId(r.id);
+                      setView('trips');
+                    }}
+                    style={{ cursor: 'pointer' }}
+                    title="押すと、このレンタカーの運行記録の入力画面に切り替わります"
+                  >
                     <td>
                       {r.startDate}
                       {r.endDate !== r.startDate && <span className="cell-sub">〜 {r.endDate}</span>}
@@ -210,10 +217,9 @@ export default function RentalTab({
                     </td>
                     <td>
                       {yen(r.cost)}
-                      {r.damageNote && <span className="pill pill-red cell-sub-pill">傷・事故の申告あり</span>}
                     </td>
                     <td>
-                      <div className="eactions">
+                      <div className="eactions" onClick={(e) => e.stopPropagation()}>
                         <button
                           className="btn btn-sm"
                           onClick={() => {
@@ -309,10 +315,6 @@ export default function RentalTab({
               <label>返却日</label>
               <input type="date" value={rec.endDate} onChange={(e) => set('endDate', e.target.value)} />
             </div>
-          </div>
-          <div className="field">
-            <label>傷・事故・違反などの申告（なければ空欄）</label>
-            <textarea rows={2} value={rec.damageNote} onChange={(e) => set('damageNote', e.target.value)} />
           </div>
           <div className="field">
             <label>備考</label>
