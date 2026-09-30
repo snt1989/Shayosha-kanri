@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
-import { AppData, Driver, EmpIdRule, Masters, Rental, Report, Reservation, Vehicle } from '@/lib/types';
+import { AppData, Driver, EmpIdRule, Masters, Rental, RentalTrip, Report, Reservation, Vehicle } from '@/lib/types';
 import Header from './Header';
 import StatBar from './StatBar';
 import DashboardTab from './DashboardTab';
@@ -193,6 +193,12 @@ export default function FleetApp() {
   async function saveRental(r: Rental) {
     return withSync(() => jsonFetch('/api/rentals', { method: 'POST', body: JSON.stringify(r) }));
   }
+  async function saveRentalTrip(t: RentalTrip) {
+    return withSync(() => jsonFetch('/api/rental-trips', { method: 'POST', body: JSON.stringify(t) }));
+  }
+  async function deleteRentalTrip(id: string) {
+    return withSync(() => jsonFetch(`/api/rental-trips/${id}`, { method: 'DELETE' }));
+  }
   async function deleteRental(id: string) {
     return withSync(() => jsonFetch(`/api/rentals/${id}`, { method: 'DELETE' }));
   }
@@ -382,6 +388,8 @@ export default function FleetApp() {
             onRequestDriverLogin={() => requireDriverLogin()}
             onSave={saveRental}
             onDelete={deleteRental}
+            onSaveTrip={saveRentalTrip}
+            onDeleteTrip={deleteRentalTrip}
           />
         )}
         {tab === 'admin' && (

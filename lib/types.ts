@@ -128,9 +128,6 @@ export type Reservation = {
   createdAt: string;
 };
 
-// レンタカーを実際に運転した人（利用者＝予約者とは別に、複数人を記録できる）
-export type RentalOperator = { driverId?: string; name: string };
-
 // レンタカーの利用記録（社用車とは別管理）
 export type Rental = {
   id: string;
@@ -142,14 +139,22 @@ export type Rental = {
   driverId?: string; // 登録した人
   driver: string;
   dept: string;
-  operators?: RentalOperator[]; // 実際に運転した人（運転者台帳から選ぶ＋台帳にない人）
   startDate: string;
   endDate: string;
   cost: number; // 料金（円）
-  startKm: number;
-  endKm: number;
   damageNote: string; // 傷・事故等の申告
   notes: string;
+  createdAt: string;
+};
+
+// レンタカーの運行記録（いつ・誰が運転したか）。レンタカー登録とは別に管理する。
+export type RentalTrip = {
+  id: string;
+  rentalId: string;
+  date: string; // 運転した日
+  driverId?: string; // 運転者台帳の人。台帳外の人は未設定
+  driver: string;
+  note: string; // 区間・用件など（任意）
   createdAt: string;
 };
 
@@ -165,6 +170,7 @@ export type AppData = {
   empIdRule: EmpIdRule;
   reservations: Reservation[];
   rentals: Rental[];
+  rentalTrips: RentalTrip[];
   vehicles: Vehicle[];
   drivers: Driver[];
   masters: Masters;

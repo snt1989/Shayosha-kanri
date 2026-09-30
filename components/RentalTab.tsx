@@ -1,10 +1,11 @@
 'use client';
 
 import { useMemo, useState } from 'react';
-import { AppData, Driver, Rental, RentalOperator } from '@/lib/types';
-import { daysUntil, todayStr } from '@/lib/utils';
+import { AppData, Driver, Rental, RentalTrip } from '@/lib/types';
+import { todayStr } from '@/lib/utils';
 import { downloadCsv, rentalsToCsv } from '@/lib/csv';
 import Modal from './Modal';
+import RentalTripsPanel from './RentalTripsPanel';
 
 const yen = (n?: number) => (n ? `${n.toLocaleString()} 円` : '-');
 
@@ -18,13 +19,9 @@ const emptyRental = (data: AppData, d: Driver | null): Rental => ({
   driverId: d?.id,
   driver: d ? `${d.lastName} ${d.firstName}` : '',
   dept: d?.dept || '',
-  // 登録した本人を運転者の初期値にする（違えば選び直す）
-  operators: d ? [{ driverId: d.id, name: `${d.lastName} ${d.firstName}` }] : [],
   startDate: todayStr(),
   endDate: todayStr(),
   cost: 0,
-  startKm: 0,
-  endKm: 0,
   damageNote: '',
   notes: '',
   createdAt: '',
@@ -36,18 +33,23 @@ export default function RentalTab({
   onRequestDriverLogin,
   onSave,
   onDelete,
+  onSaveTrip,
+  onDeleteTrip,
 }: {
   data: AppData;
   currentDriver: Driver | null;
   onRequestDriverLogin: () => void;
   onSave: (r: Rental) => Promise<unknown>;
   onDelete: (id: string) => Promise<unknown>;
+  onSaveTrip: (t: RentalTrip) => Promise<unknown>;
+  onDeleteTrip: (id: string) => Promise<unknown>;
 }) {
+  const [view, setView] = useState<'rentals' | 'trips'>('rentals');
+  const [tripRentalId, setTripRentalId] = useState('');
   const [query, setQuery] = useState('');
   const [rec, setRec] = useState<Rental | null>(null);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
-  const [extraName, setExtraName] = useState('');
 
   const month = todayStr().slice(0, 7);
   const all = useMemo(
@@ -58,7 +60,7 @@ export default function RentalTab({
     const q = query.trim();
     if (!q) return all;
     return all.filter((r) =>
-      [r.driver, r.company, r.carModel, r.plate, r.reservationNo, ...(r.operators || []).map((o) => o.name)].some((s) => (s || '').includes(q))
+      [r.driver, r.company, r.carModel, r.plate, r.reservationNo].some((s) => (s || '').includes(q))
     );
   }, [all, query]);
   const monthRows = all.filter((r) => r.startDate.startsWith(month));
@@ -77,12 +79,13 @@ export default function RentalTab({
   function openEdit(r: Rental) {
     guard(() => {
       setError('');
-      setRec({ ...r, operators: [...(r.operators || [])] });
+      setRec({ ...r });
     });
   }
   async function remove(r: Rental) {
     if (!currentDriver) return onRequestDriverLogin();
-    if (!confirm(`${r.startDate} ${r.company} のレンタカー記録を削除しますか？`)) return;
+    const n = tripCount(r.id);
+    if (!confirm(`${r.startDate} ${r.company} のレンタカー記録を削除しますか？${n ? `\n（運行記録${n}件も一緒に削除されます）` : ''}`)) return;
     await onDelete(r.id);
   }
 
@@ -91,8 +94,6 @@ export default function RentalTab({
     if (!rec.company) return setError('レンタカー会社を選んでください。');
     if (!rec.startDate) return setError('利用開始日を入力してください。');
     if (rec.endDate && rec.endDate < rec.startDate) return setError('返却日は利用開始日以降にしてください。');
-    if ((rec.operators || []).length === 0) return setError('運転した人を1人以上選んでください。');
-    if (rec.endKm && rec.startKm && rec.endKm < rec.startKm) return setError('返却メーターは出発メーター以上にしてください。');
     setSaving(true);
     setError('');
     try {
@@ -107,26 +108,22 @@ export default function RentalTab({
 
   const set = <K extends keyof Rental>(k: K, v: Rental[K]) => rec && setRec({ ...rec, [k]: v });
   const numIn = (v: string) => (v === '' ? 0 : Math.max(0, Number(v) || 0));
-  const ops = rec?.operators || [];
-  const isChecked = (d: Driver) => ops.some((o) => o.driverId === d.id);
-  function toggleOp(d: Driver) {
-    set('operators', isChecked(d) ? ops.filter((o) => o.driverId !== d.id) : [...ops, { driverId: d.id, name: `${d.lastName} ${d.firstName}` }]);
+  const tripCount = (id: string) => data.rentalTrips.filter((t) => t.rentalId === id).length;
+
+  if (view === 'trips') {
+    return (
+      <RentalTripsPanel
+        data={data}
+        currentDriver={currentDriver}
+        onRequestDriverLogin={onRequestDriverLogin}
+        onSave={onSaveTrip}
+        onDelete={onDeleteTrip}
+        rentalId={tripRentalId}
+        onRentalIdChange={setTripRentalId}
+        onBack={() => setView('rentals')}
+      />
+    );
   }
-  const extraOps = ops.filter((o) => !o.driverId);
-  function addExtra() {
-    const n = extraName.trim();
-    if (!n || ops.some((o) => o.name === n)) return;
-    set('operators', [...ops, { name: n } as RentalOperator]);
-    setExtraName('');
-  }
-  const licenseWarn = (d: Driver) => {
-    const days = daysUntil(d.licenseExpiry);
-    if (days === null) return '免許期限 未設定';
-    if (days < 0) return '免許期限切れ';
-    if (days <= 30) return `免許あと${days}日`;
-    return '';
-  };
-  const tripKm = rec && rec.endKm && rec.startKm ? rec.endKm - rec.startKm : 0;
 
   return (
     <div>
@@ -137,7 +134,7 @@ export default function RentalTab({
               🚗 レンタカー登録 <span className="pill pill-slate">社用車とは別管理</span>
             </h3>
             <div style={{ fontSize: 12, color: 'var(--slate-500)' }}>
-              借りたレンタカーと、実際に運転した人・料金を記録します。
+              借りたレンタカーと料金を登録します。誰が運転したかは「運行記録」で別に管理します。
             </div>
           </div>
           <div className="actions">
@@ -150,6 +147,15 @@ export default function RentalTab({
             />
             <button className="btn btn-sm" onClick={() => downloadCsv(`レンタカー記録_${todayStr()}.csv`, rentalsToCsv(all))} disabled={all.length === 0}>
               ⬇ CSV出力
+            </button>
+            <button
+              className="btn btn-sm"
+              onClick={() => {
+                setTripRentalId('');
+                setView('trips');
+              }}
+            >
+              📋 運行記録（{data.rentalTrips.length}）
             </button>
             <button className="btn btn-primary btn-sm" onClick={openNew}>
               ＋ レンタカーを登録
@@ -181,7 +187,6 @@ export default function RentalTab({
                 <tr>
                   <th>利用期間</th>
                   <th>レンタカー</th>
-                  <th>運転した人</th>
                   <th>登録者</th>
                   <th>料金</th>
                   <th>操作</th>
@@ -200,23 +205,24 @@ export default function RentalTab({
                       {r.reservationNo && <span className="cell-sub">予約番号 {r.reservationNo}</span>}
                     </td>
                     <td>
-                      {(r.operators || []).length === 0 ? (
-                        <span style={{ color: 'var(--slate-400)' }}>未記録</span>
-                      ) : (
-                        (r.operators || []).map((o, i) => <div key={i}>{o.name}</div>)
-                      )}
-                      {r.damageNote && <span className="pill pill-red cell-sub-pill">傷・事故の申告あり</span>}
-                    </td>
-                    <td>
                       {r.driver}
                       <span className="cell-sub">{r.dept}</span>
                     </td>
                     <td>
                       {yen(r.cost)}
-                      {r.endKm > 0 && r.startKm > 0 && <span className="cell-sub">走行 {r.endKm - r.startKm} km</span>}
+                      {r.damageNote && <span className="pill pill-red cell-sub-pill">傷・事故の申告あり</span>}
                     </td>
                     <td>
                       <div className="eactions">
+                        <button
+                          className="btn btn-sm"
+                          onClick={() => {
+                            setTripRentalId(r.id);
+                            setView('trips');
+                          }}
+                        >
+                          📋 運行記録（{tripCount(r.id)}）
+                        </button>
                         <button className="btn btn-sm" onClick={() => openEdit(r)}>
                           編集
                         </button>
@@ -304,58 +310,6 @@ export default function RentalTab({
               <input type="date" value={rec.endDate} onChange={(e) => set('endDate', e.target.value)} />
             </div>
           </div>
-          <div className="field-row">
-            <div className="field">
-              <label>出発メーター（km）</label>
-              <input type="number" min={0} value={rec.startKm || ''} onChange={(e) => set('startKm', numIn(e.target.value))} />
-            </div>
-            <div className="field">
-              <label>返却メーター（km）{tripKm > 0 && ` ／ 走行 ${tripKm} km`}</label>
-              <input type="number" min={0} value={rec.endKm || ''} onChange={(e) => set('endKm', numIn(e.target.value))} />
-            </div>
-          </div>
-
-          <div className="section-heading">運転した人</div>
-          <div style={{ fontSize: 12, color: 'var(--slate-500)', marginBottom: 6 }}>
-            運転者台帳から選んでください（複数可）。台帳にない人は下の欄から名前で追加できます。
-          </div>
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginBottom: 8 }}>
-            {data.drivers.map((d) => {
-              const warn = licenseWarn(d);
-              return (
-                <label key={d.id} className="btn btn-sm" style={{ display: 'inline-flex', gap: 6, alignItems: 'center', cursor: 'pointer', background: isChecked(d) ? 'var(--green-100)' : undefined }}>
-                  <input type="checkbox" checked={isChecked(d)} onChange={() => toggleOp(d)} style={{ width: 'auto' }} />
-                  {d.lastName} {d.firstName}
-                  {warn && <span className="pill pill-red">{warn}</span>}
-                </label>
-              );
-            })}
-          </div>
-          {extraOps.length > 0 && (
-            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 8 }}>
-              {extraOps.map((o) => (
-                <span key={o.name} className="pill pill-slate">
-                  {o.name}（台帳外）
-                  <button style={{ marginLeft: 4, border: 0, background: 'none', cursor: 'pointer' }} onClick={() => set('operators', ops.filter((x) => x !== o))}>
-                    ×
-                  </button>
-                </span>
-              ))}
-            </div>
-          )}
-          <div style={{ display: 'flex', gap: 6, marginBottom: 10 }}>
-            <input
-              value={extraName}
-              placeholder="台帳にない人の名前（例: ○○商事 佐藤）"
-              onChange={(e) => setExtraName(e.target.value)}
-              onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); addExtra(); } }}
-              style={{ flex: 1, padding: '8px 10px', border: '1px solid var(--slate-300)', borderRadius: 8 }}
-            />
-            <button className="btn btn-sm" onClick={addExtra} disabled={!extraName.trim()}>
-              追加
-            </button>
-          </div>
-
           <div className="field">
             <label>傷・事故・違反などの申告（なければ空欄）</label>
             <textarea rows={2} value={rec.damageNote} onChange={(e) => set('damageNote', e.target.value)} />

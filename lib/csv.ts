@@ -1,4 +1,4 @@
-import { Driver, LogEntry, MASTER_KEYS, MASTER_LABELS, MasterKey, Masters, Rental, Vehicle } from './types';
+import { Driver, LogEntry, MASTER_KEYS, MASTER_LABELS, MasterKey, Masters, Rental, RentalTrip, Vehicle } from './types';
 import { genId } from './utils';
 
 function csvEscape(v: unknown): string {
@@ -211,15 +211,22 @@ export function downloadJson(filename: string, data: unknown) {
 }
 
 /* ---------- rentals ---------- */
-const RENTAL_HEADERS = ['利用開始日', '返却日', 'レンタカー会社', '車種クラス', '車種', 'ナンバー', '予約番号', '登録者', '運転者', '部署', '料金', '出発メーター', '返却メーター', '傷・事故の申告', '備考'];
+const RENTAL_HEADERS = ['利用開始日', '返却日', 'レンタカー会社', '車種クラス', '車種', 'ナンバー', '予約番号', '登録者', '部署', '料金', '傷・事故の申告', '備考'];
 
 export function rentalsToCsv(list: Rental[]): string {
   const rows: (string | number)[][] = [RENTAL_HEADERS];
   list.forEach((r) => {
-    rows.push([
-      r.startDate, r.endDate, r.company, r.carClass, r.carModel, r.plate, r.reservationNo, r.driver,
-      (r.operators || []).map((o) => o.name).join('・'), r.dept, r.cost || '', r.startKm || '', r.endKm || '', r.damageNote, r.notes,
-    ]);
+    rows.push([r.startDate, r.endDate, r.company, r.carClass, r.carModel, r.plate, r.reservationNo, r.driver, r.dept, r.cost || '', r.damageNote, r.notes]);
+  });
+  return toCsv(rows);
+}
+
+export function rentalTripsToCsv(trips: RentalTrip[], rentals: Rental[]): string {
+  const byId = new Map(rentals.map((r) => [r.id, r]));
+  const rows: (string | number)[][] = [['運転日', '運転者', 'レンタカー会社', '車種', 'ナンバー', '備考']];
+  trips.forEach((t) => {
+    const r = byId.get(t.rentalId);
+    rows.push([t.date, t.driver, r?.company || '', r?.carModel || '', r?.plate || '', t.note]);
   });
   return toCsv(rows);
 }

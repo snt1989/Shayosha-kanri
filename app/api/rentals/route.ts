@@ -20,15 +20,7 @@ export async function POST(req: NextRequest) {
   if (r.endDate < r.startDate) {
     return NextResponse.json({ success: false, message: '返却日は利用開始日以降にしてください。' }, { status: 400 });
   }
-  r.operators = (Array.isArray(r.operators) ? r.operators : [])
-    .map((o) => ({ ...(o.driverId ? { driverId: o.driverId } : {}), name: String(o.name || '').trim() }))
-    .filter((o) => o.name);
-  if (r.operators.length === 0) {
-    return NextResponse.json({ success: false, message: '運転した人を1人以上選んでください。' }, { status: 400 });
-  }
   r.cost = num(r.cost);
-  r.startKm = num(r.startKm);
-  r.endKm = num(r.endKm);
   r.createdAt = r.createdAt || new Date().toISOString();
 
   const data = await loadData();
@@ -40,7 +32,7 @@ export async function POST(req: NextRequest) {
     actor: isAdminCookieValid(req.cookies.get(ADMIN_COOKIE)?.value) ? 'admin' : 'user',
     action: isNew || idx < 0 ? 'レンタカー登録' : 'レンタカー更新',
     target: `${r.startDate} ${r.company} ${r.carModel || ''}`.trim(),
-    detail: `運転者: ${r.operators.map((o) => o.name).join('・')}`,
+    detail: r.plate || undefined,
   });
 
   await saveData({

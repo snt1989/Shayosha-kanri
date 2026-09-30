@@ -9,6 +9,7 @@ import {
   DEFAULT_VEHICLES,
   Masters,
   Rental,
+  RentalTrip,
   Reservation,
 } from './types';
 
@@ -26,6 +27,7 @@ function defaultData(): Omit<AppData, 'persistent'> {
     reports: [],
     reservations: [],
     rentals: [],
+    rentalTrips: [],
     empIdRule: { ...DEFAULT_EMP_ID_RULE },
     // モジュール定数への参照をそのまま返すと、呼び出し側の push 等でこの
     // プロセスの「デフォルトデータ」自体が汚染されてしまうため、必ずコピーを返す。
@@ -79,6 +81,7 @@ async function readLocal(): Promise<Omit<AppData, 'persistent'>> {
       reports: parsed.reports ?? [],
       reservations: parsed.reservations ?? [],
       rentals: parsed.rentals ?? [],
+      rentalTrips: parsed.rentalTrips ?? [],
       empIdRule: { ...DEFAULT_EMP_ID_RULE, ...(parsed.empIdRule ?? {}) },
       vehicles: parsed.vehicles ?? DEFAULT_VEHICLES.map((v) => ({ ...v, maintHistory: [...v.maintHistory] })),
       drivers: parsed.drivers ?? DEFAULT_DRIVERS.map((d) => ({ ...d })),
@@ -110,6 +113,7 @@ export async function loadData(): Promise<AppData> {
       reports: raw.reports ?? [],
       reservations: raw.reservations ?? [],
       rentals: raw.rentals ?? [],
+      rentalTrips: raw.rentalTrips ?? [],
       empIdRule: { ...DEFAULT_EMP_ID_RULE, ...(raw.empIdRule ?? {}) },
       vehicles: raw.vehicles ?? DEFAULT_VEHICLES.map((v) => ({ ...v, maintHistory: [...v.maintHistory] })),
       drivers: raw.drivers ?? DEFAULT_DRIVERS.map((d) => ({ ...d })),
@@ -123,14 +127,15 @@ export async function loadData(): Promise<AppData> {
 }
 
 // reservations を渡さない呼び出し（日報・車両などの保存）では、保存済みの予約をそのまま引き継ぐ。
-type SaveInput = Omit<AppData, 'persistent' | 'reservations' | 'rentals' | 'empIdRule'> & { reservations?: Reservation[]; rentals?: Rental[]; empIdRule?: EmpIdRule };
+type SaveInput = Omit<AppData, 'persistent' | 'reservations' | 'rentals' | 'rentalTrips' | 'empIdRule'> & { reservations?: Reservation[]; rentals?: Rental[]; rentalTrips?: RentalTrip[]; empIdRule?: EmpIdRule };
 
 export async function saveData(input: SaveInput): Promise<void> {
-  const existing = input.reservations && input.rentals && input.empIdRule ? null : await loadData();
+  const existing = input.reservations && input.rentals && input.rentalTrips && input.empIdRule ? null : await loadData();
   const data: Omit<AppData, 'persistent'> = {
     ...input,
     reservations: input.reservations ?? existing?.reservations ?? [],
     rentals: input.rentals ?? existing?.rentals ?? [],
+    rentalTrips: input.rentalTrips ?? existing?.rentalTrips ?? [],
     empIdRule: input.empIdRule ?? existing?.empIdRule ?? { ...DEFAULT_EMP_ID_RULE },
   };
   if (hasUpstash()) {
