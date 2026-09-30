@@ -12,6 +12,10 @@ export async function POST(req: NextRequest) {
   }
   const masters: Masters = await req.json();
   const data = await loadData();
+  // 古い形式のCSV（レンタカー用マスタを含まない）を取り込んでも、既存のレンタカー用マスタは消さない
+  for (const k of MASTER_KEYS) {
+    if (!masters[k] || (masters[k].length === 0 && (k === 'rentalCompanies' || k === 'rentalCarClasses'))) masters[k] = data.masters[k];
+  }
   data.masters = masters;
   const total = MASTER_KEYS.reduce((sum, k) => sum + (masters[k]?.length || 0), 0);
   pushLog(data, {

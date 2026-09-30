@@ -135,7 +135,7 @@ export function mastersToCsv(masters: Masters): string {
 
 export function csvToMasters(text: string): Masters {
   const rows = parseCsv(text);
-  const result = { departments: [], checkers: [], checkMethods: [], maintTypes: [], tireTypes: [], licenseTypes: [] } as Masters;
+  const result = Object.fromEntries(MASTER_KEYS.map((k) => [k, [] as string[]])) as Masters;
   if (rows.length === 0) return result;
   const masterKeySet: readonly string[] = MASTER_KEYS;
   const labelToKey = new Map<string, MasterKey>(MASTER_KEYS.map((k) => [MASTER_LABELS[k], k]));
