@@ -33,7 +33,25 @@ export default function DriversTab({
   const [query, setQuery] = useState('');
   const [editing, setEditing] = useState<Driver | null>(null);
   const [saving, setSaving] = useState(false);
+  const [viewingId, setViewingId] = useState<string | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
+
+  const reportsOf = (d: Driver) =>
+    data.reports.filter((r) => (r.driverId ? r.driverId === d.id : r.driver.replace(/\s/g, '') === `${d.lastName}${d.firstName}`));
+  const countById = useMemo(() => {
+    const m: Record<string, number> = {};
+    data.drivers.forEach((d) => {
+      m[d.id] = reportsOf(d).length;
+    });
+    return m;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [data.drivers, data.reports]);
+  const viewDriver = viewingId ? data.drivers.find((d) => d.id === viewingId) || null : null;
+  const driveRows = viewDriver
+    ? reportsOf(viewDriver).sort((a, b) => (b.date + b.preTime).localeCompare(a.date + a.preTime))
+    : [];
+  const driveKm = driveRows.reduce((s, r) => s + (r.postDone ? r.tripKm || 0 : 0), 0);
+  const driveOut = driveRows.filter((r) => !r.postDone).length;
 
   const filtered = useMemo(() => {
     const q = query.trim();
@@ -163,9 +181,14 @@ export default function DriversTab({
                   </div>
                 </div>
                 <div className="efoot">
-                  <button className="btn btn-sm" onClick={() => openEdit(d)}>
-                    編集
-                  </button>
+                  <div className="eactions">
+                    <button className="btn btn-sm" onClick={() => openEdit(d)}>
+                      ✏️ 編集
+                    </button>
+                    <button className="btn btn-sm" onClick={() => setViewingId(d.id)}>
+                      📋 運転記録（{countById[d.id] || 0}）
+                    </button>
+                  </div>
                   <span className="eid">{d.id}</span>
                   <button className="btn btn-sm btn-danger" onClick={() => handleDelete(d.id)}>
                     削除
@@ -176,6 +199,75 @@ export default function DriversTab({
           </div>
         )}
       </div>
+
+      {viewDriver && (
+        <Modal
+          wide
+          title={`📋 運転記録 — ${viewDriver.lastName} ${viewDriver.firstName}`}
+          onClose={() => setViewingId(null)}
+          footer={
+            <button className="btn" onClick={() => setViewingId(null)}>
+              閉じる
+            </button>
+          }
+        >
+          <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap', fontSize: 13, color: 'var(--slate-600)', marginBottom: 10 }}>
+            <span>{viewDriver.dept}</span>
+            <span>全{driveRows.length}件</span>
+            <span>実走行合計 {driveKm.toLocaleString()} km</span>
+            {driveOut > 0 && <span className="pill pill-amber">出庫中 {driveOut}件</span>}
+          </div>
+          {driveRows.length === 0 ? (
+            <div className="empty-state">この運転者の運転記録はまだありません</div>
+          ) : (
+            <div className="table-wrap">
+              <table className="data-table">
+                <thead>
+                  <tr>
+                    <th>日付</th>
+                    <th>車両</th>
+                    <th>行先・用件</th>
+                    <th>出発〜帰着</th>
+                    <th>メーター（実走行）</th>
+                    <th>状態</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {driveRows.map((r) => (
+                    <tr key={r.id}>
+                      <td>{r.date}</td>
+                      <td>
+                        {r.vehicleName}
+                        <span className="cell-sub">{r.plate}</span>
+                      </td>
+                      <td>
+                        {r.destination}
+                        {r.purpose && <span className="cell-sub">{r.purpose}</span>}
+                      </td>
+                      <td>
+                        {r.preTime}〜{r.postDone ? r.postTime : ''}
+                      </td>
+                      <td>
+                        {r.postDone
+                          ? `${r.startKm.toLocaleString()}→${r.endKm.toLocaleString()}km（${r.tripKm}km）`
+                          : `${r.startKm.toLocaleString()}km〜`}
+                      </td>
+                      <td>
+                        {r.postDone ? <span className="pill pill-green">帰着済</span> : <span className="pill pill-amber">出庫中</span>}
+                        {r.maintRequest && (
+                          <span className={`pill ${r.maintRequestDone ? 'pill-green' : 'pill-red'} cell-sub-pill`}>
+                            🔧 整備依頼{r.maintRequestDone ? '（対応済）' : ''}
+                          </span>
+                        )}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </Modal>
+      )}
 
       {editing && (
         <Modal
