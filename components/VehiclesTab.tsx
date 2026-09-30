@@ -1,7 +1,7 @@
 'use client';
 
 import { useMemo, useRef, useState } from 'react';
-import { AppData, MaintRecord, Vehicle } from '@/lib/types';
+import { AppData, Vehicle } from '@/lib/types';
 import { daysUntil, genId, openMaintRequests, todayStr } from '@/lib/utils';
 import { csvToVehicles, downloadCsv, vehiclesToCsv } from '@/lib/csv';
 import Modal from './Modal';
@@ -33,7 +33,6 @@ export default function VehiclesTab({
   const [query, setQuery] = useState('');
   const [editing, setEditing] = useState<Vehicle | null>(null);
   const [saving, setSaving] = useState(false);
-  const [newMaint, setNewMaint] = useState<Partial<MaintRecord>>({});
   const [bulkRows, setBulkRows] = useState<Vehicle[] | null>(null);
   const [bulkSaving, setBulkSaving] = useState(false);
   // 各車両の「整備記録」「運転記録」を一覧で見る画面
@@ -54,11 +53,9 @@ export default function VehiclesTab({
 
   function openNew() {
     setEditing(emptyVehicle(data));
-    setNewMaint({});
   }
   function openEdit(v: Vehicle) {
     setEditing({ ...v, maintHistory: [...v.maintHistory] });
-    setNewMaint({});
   }
 
   async function handleSubmit() {
@@ -79,28 +76,6 @@ export default function VehiclesTab({
   async function handleDelete(id: string) {
     if (!confirm('この車両を削除しますか？関連する過去の日報は残ります。')) return;
     await onDelete(id);
-  }
-
-  function addMaint() {
-    if (!editing) return;
-    if (!newMaint.type) {
-      alert('整備種別を選択してください。');
-      return;
-    }
-    const rec: MaintRecord = {
-      date: newMaint.date || todayStr(),
-      type: newMaint.type,
-      km: Number(newMaint.km || editing.odometer),
-      note: newMaint.note || '',
-    };
-    setEditing({ ...editing, maintHistory: [rec, ...editing.maintHistory] });
-    setNewMaint({});
-  }
-  function removeMaint(idx: number) {
-    if (!editing) return;
-    const list = [...editing.maintHistory];
-    list.splice(idx, 1);
-    setEditing({ ...editing, maintHistory: list });
   }
 
   function shakenBadge(v: Vehicle) {
@@ -320,7 +295,7 @@ export default function VehiclesTab({
                   openEdit(viewVehicle);
                 }}
               >
-                ✏️ 車両情報・整備記録を編集
+                ✏️ 車両情報を編集
               </button>
             </>
           }
@@ -331,6 +306,7 @@ export default function VehiclesTab({
             <span>費用合計 {maintCost.toLocaleString()} 円</span>
             <span>現在の走行距離 {viewVehicle.odometer.toLocaleString()} km</span>
           </div>
+          <div style={{ fontSize: 12, color: 'var(--slate-500)', marginBottom: 10 }}>整備記録の追加・修正・削除は「整備台帳」タブで行います。</div>
           {maintRequests.length > 0 && (
             <div style={{ marginBottom: 12 }}>
               <div style={{ fontWeight: 700, fontSize: 13, marginBottom: 6 }}>
@@ -517,69 +493,6 @@ export default function VehiclesTab({
               ))}
             </select>
           </div>
-
-          <div className="section-heading">整備履歴</div>
-          <div className="field-row">
-            <div className="field">
-              <label>実施日</label>
-              <input type="date" value={newMaint.date || ''} onChange={(e) => setNewMaint({ ...newMaint, date: e.target.value })} />
-            </div>
-            <div className="field">
-              <label>整備種別</label>
-              <select value={newMaint.type || ''} onChange={(e) => setNewMaint({ ...newMaint, type: e.target.value })}>
-                <option value="">選択</option>
-                {data.masters.maintTypes.map((t) => (
-                  <option key={t} value={t}>
-                    {t}
-                  </option>
-                ))}
-              </select>
-            </div>
-            <div className="field">
-              <label>走行km</label>
-              <input type="number" value={newMaint.km ?? ''} onChange={(e) => setNewMaint({ ...newMaint, km: Number(e.target.value) })} />
-            </div>
-          </div>
-          <div className="field-row">
-            <div className="field">
-              <label>備考</label>
-              <input value={newMaint.note || ''} onChange={(e) => setNewMaint({ ...newMaint, note: e.target.value })} />
-            </div>
-          </div>
-          <button className="btn btn-sm" type="button" onClick={addMaint}>
-            ＋ 整備履歴を追加
-          </button>
-
-          {editing.maintHistory.length > 0 && (
-            <div className="table-wrap" style={{ marginTop: 12 }}>
-              <table className="data-table">
-                <thead>
-                  <tr>
-                    <th>日付</th>
-                    <th>種別</th>
-                    <th>km</th>
-                    <th>備考</th>
-                    <th></th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {editing.maintHistory.map((m, idx) => (
-                    <tr key={idx}>
-                      <td>{m.date}</td>
-                      <td>{m.type}</td>
-                      <td>{m.km.toLocaleString()}</td>
-                      <td>{m.note}</td>
-                      <td>
-                        <button className="btn btn-sm btn-danger" onClick={() => removeMaint(idx)}>
-                          削除
-                        </button>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
         </Modal>
       )}
 
