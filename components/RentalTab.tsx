@@ -32,6 +32,9 @@ export default function RentalTab({
   onRequestDriverLogin,
   onSave,
   onDelete,
+  onReturn,
+  isAdmin,
+  onRequestAdminLogin,
   onSaveTrip,
   onDeleteTrip,
 }: {
@@ -40,6 +43,9 @@ export default function RentalTab({
   onRequestDriverLogin: () => void;
   onSave: (r: Rental) => Promise<unknown>;
   onDelete: (id: string) => Promise<unknown>;
+  onReturn: (id: string) => Promise<unknown>;
+  isAdmin: boolean;
+  onRequestAdminLogin: () => void;
   onSaveTrip: (t: RentalTrip) => Promise<unknown>;
   onDeleteTrip: (id: string) => Promise<unknown>;
 }) {
@@ -68,6 +74,20 @@ export default function RentalTab({
   function guard(fn: () => void) {
     if (!currentDriver) return onRequestDriverLogin();
     fn();
+  }
+  // 編集・削除は管理者ログイン後に操作できる。未ログインなら管理者ログインを開く
+  function adminOnly(fn: () => void) {
+    if (!isAdmin) return onRequestAdminLogin();
+    fn();
+  }
+  async function doReturn(r: Rental) {
+    if (!currentDriver) return onRequestDriverLogin();
+    if (!confirm(`${r.company} ${r.carModel || ''} を本日返却として記録しますか？`)) return;
+    try {
+      await onReturn(r.id);
+    } catch (e) {
+      alert((e as Error)?.message || '返却を記録できませんでした。');
+    }
   }
   function openNew() {
     guard(() => {
@@ -117,6 +137,8 @@ export default function RentalTab({
         onRequestDriverLogin={onRequestDriverLogin}
         onSave={onSaveTrip}
         onDelete={onDeleteTrip}
+        isAdmin={isAdmin}
+        onRequestAdminLogin={onRequestAdminLogin}
         rentalId={tripRentalId}
         onRentalIdChange={setTripRentalId}
         onBack={() => setView('rentals')}
@@ -146,15 +168,6 @@ export default function RentalTab({
             />
             <button className="btn btn-sm" onClick={() => downloadCsv(`レンタカー記録_${todayStr()}.csv`, rentalsToCsv(all))} disabled={all.length === 0}>
               ⬇ CSV出力
-            </button>
-            <button
-              className="btn btn-sm"
-              onClick={() => {
-                setTripRentalId('');
-                setView('trips');
-              }}
-            >
-              📋 運行記録（{data.rentalTrips.length}）
             </button>
             <button className="btn btn-primary btn-sm" onClick={openNew}>
               ＋ レンタカーを登録
@@ -210,6 +223,11 @@ export default function RentalTab({
                       {r.company}
                       <span className="cell-sub">{[r.carClass, r.carModel, r.plate].filter(Boolean).join(' / ') || '-'}</span>
                       {r.reservationNo && <span className="cell-sub">予約番号 {r.reservationNo}</span>}
+                      {r.returnedAt ? (
+                        <span className="pill pill-green cell-sub-pill">返却済 {r.returnedAt}</span>
+                      ) : (
+                        <span className="pill pill-amber cell-sub-pill">利用中</span>
+                      )}
                     </td>
                     <td>
                       {r.driver}
@@ -220,20 +238,16 @@ export default function RentalTab({
                     </td>
                     <td>
                       <div className="eactions" onClick={(e) => e.stopPropagation()}>
-                        <button
-                          className="btn btn-sm"
-                          onClick={() => {
-                            setTripRentalId(r.id);
-                            setView('trips');
-                          }}
-                        >
-                          📋 運行記録（{tripCount(r.id)}）
+                        {!r.returnedAt && (
+                          <button className="btn btn-sm btn-primary" onClick={() => doReturn(r)}>
+                            ↩️ 返却
+                          </button>
+                        )}
+                        <button className="btn btn-sm" onClick={() => adminOnly(() => openEdit(r))} title={isAdmin ? '' : '管理者ログインが必要です'}>
+                          {isAdmin ? '' : '🔒 '}編集
                         </button>
-                        <button className="btn btn-sm" onClick={() => openEdit(r)}>
-                          編集
-                        </button>
-                        <button className="btn btn-sm btn-danger" onClick={() => remove(r)}>
-                          削除
+                        <button className="btn btn-sm btn-danger" onClick={() => adminOnly(() => remove(r))} title={isAdmin ? '' : '管理者ログインが必要です'}>
+                          {isAdmin ? '' : '🔒 '}削除
                         </button>
                       </div>
                     </td>

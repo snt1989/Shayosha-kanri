@@ -7,6 +7,9 @@ export const dynamic = 'force-dynamic';
 
 export async function DELETE(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
+  if (!isAdminCookieValid(req.cookies.get(ADMIN_COOKIE)?.value)) {
+    return NextResponse.json({ success: false, message: '削除には管理者ログインが必要です。' }, { status: 401 });
+  }
   const data = await loadData();
   const target = data.rentalTrips.find((x) => x.id === id);
   if (!target) {
@@ -14,7 +17,7 @@ export async function DELETE(req: NextRequest, { params }: { params: Promise<{ i
   }
   data.rentalTrips = data.rentalTrips.filter((x) => x.id !== id);
   pushLog(data, {
-    actor: isAdminCookieValid(req.cookies.get(ADMIN_COOKIE)?.value) ? 'admin' : 'user',
+    actor: 'admin',
     action: 'レンタカー運行記録削除',
     target: `${target.date} ${target.driver}`,
   });

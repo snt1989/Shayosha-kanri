@@ -15,7 +15,11 @@ export async function POST(req: NextRequest) {
   if (!t.rentalId || !t.date || !t.driver) {
     return NextResponse.json({ success: false, message: 'レンタカー・運転日・運転者は必須です。' }, { status: 400 });
   }
+  const isAdminReq = isAdminCookieValid(req.cookies.get(ADMIN_COOKIE)?.value);
   const data = await loadData();
+  if (!isNew && data.rentalTrips.some((x) => x.id === t.id) && !isAdminReq) {
+    return NextResponse.json({ success: false, message: '記録の編集には管理者ログインが必要です。' }, { status: 401 });
+  }
   const rental = data.rentals.find((x) => x.id === t.rentalId);
   if (!rental) {
     return NextResponse.json({ success: false, message: '対象のレンタカーが見つかりません。' }, { status: 404 });
@@ -28,7 +32,7 @@ export async function POST(req: NextRequest) {
   else data.rentalTrips.push(t);
 
   pushLog(data, {
-    actor: isAdminCookieValid(req.cookies.get(ADMIN_COOKIE)?.value) ? 'admin' : 'user',
+    actor: isAdminReq ? 'admin' : 'user',
     action: isNew || idx < 0 ? 'レンタカー運行記録登録' : 'レンタカー運行記録更新',
     target: `${t.date} ${t.driver} / ${rental.company} ${rental.carModel || ''}`.trim(),
     detail: t.note || undefined,

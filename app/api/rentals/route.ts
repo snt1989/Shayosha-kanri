@@ -23,13 +23,19 @@ export async function POST(req: NextRequest) {
   r.cost = num(r.cost);
   r.createdAt = r.createdAt || new Date().toISOString();
 
+  const isAdminReq = isAdminCookieValid(req.cookies.get(ADMIN_COOKIE)?.value);
   const data = await loadData();
   const idx = data.rentals.findIndex((x) => x.id === r.id);
+  // 登録済みの記録の編集は管理者のみ（返却は専用の返却ボタンから）
+  if (idx >= 0 && !isAdminReq) {
+    return NextResponse.json({ success: false, message: '記録の編集には管理者ログインが必要です。' }, { status: 401 });
+  }
+  if (idx >= 0) r.createdAt = data.rentals[idx].createdAt || r.createdAt;
   if (idx >= 0) data.rentals[idx] = r;
   else data.rentals.push(r);
 
   pushLog(data, {
-    actor: isAdminCookieValid(req.cookies.get(ADMIN_COOKIE)?.value) ? 'admin' : 'user',
+    actor: isAdminReq ? 'admin' : 'user',
     action: isNew || idx < 0 ? 'レンタカー登録' : 'レンタカー更新',
     target: `${r.startDate} ${r.company} ${r.carModel || ''}`.trim(),
     detail: r.plate || undefined,

@@ -190,17 +190,29 @@ export default function FleetApp() {
       throw e;
     }
   }
+  // 編集・削除は管理者のみ。401（管理者ログイン切れ）のときは画面側もログアウト状態に合わせる
+  async function rentalAdminCall(fn: () => Promise<unknown>) {
+    try {
+      return await withSync(fn);
+    } catch (e) {
+      handleAdminApiError(e);
+      throw e;
+    }
+  }
   async function saveRental(r: Rental) {
-    return withSync(() => jsonFetch('/api/rentals', { method: 'POST', body: JSON.stringify(r) }));
-  }
-  async function saveRentalTrip(t: RentalTrip) {
-    return withSync(() => jsonFetch('/api/rental-trips', { method: 'POST', body: JSON.stringify(t) }));
-  }
-  async function deleteRentalTrip(id: string) {
-    return withSync(() => jsonFetch(`/api/rental-trips/${id}`, { method: 'DELETE' }));
+    return rentalAdminCall(() => jsonFetch('/api/rentals', { method: 'POST', body: JSON.stringify(r) }));
   }
   async function deleteRental(id: string) {
-    return withSync(() => jsonFetch(`/api/rentals/${id}`, { method: 'DELETE' }));
+    return rentalAdminCall(() => jsonFetch(`/api/rentals/${id}`, { method: 'DELETE' }));
+  }
+  async function returnRental(id: string) {
+    return withSync(() => jsonFetch(`/api/rentals/${id}/return`, { method: 'POST', body: JSON.stringify({}) }));
+  }
+  async function saveRentalTrip(t: RentalTrip) {
+    return rentalAdminCall(() => jsonFetch('/api/rental-trips', { method: 'POST', body: JSON.stringify(t) }));
+  }
+  async function deleteRentalTrip(id: string) {
+    return rentalAdminCall(() => jsonFetch(`/api/rental-trips/${id}`, { method: 'DELETE' }));
   }
   async function saveEmpIdRule(r: EmpIdRule & { assignMissing?: boolean }) {
     try {
@@ -387,6 +399,9 @@ export default function FleetApp() {
             currentDriver={currentDriver}
             onRequestDriverLogin={() => requireDriverLogin()}
             onSave={saveRental}
+            onReturn={returnRental}
+            isAdmin={isAdmin}
+            onRequestAdminLogin={() => setShowAdminLogin(true)}
             onDelete={deleteRental}
             onSaveTrip={saveRentalTrip}
             onDeleteTrip={deleteRentalTrip}

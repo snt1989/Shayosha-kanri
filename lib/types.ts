@@ -143,6 +143,7 @@ export type Rental = {
   endDate: string;
   cost: number; // 料金（円）
   notes: string;
+  returnedAt?: string; // 返却した日（返却ボタンで記録）。未設定なら利用中
   createdAt: string;
 };
 

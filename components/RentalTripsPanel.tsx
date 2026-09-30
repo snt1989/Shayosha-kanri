@@ -73,6 +73,8 @@ export default function RentalTripsPanel({
   onRequestDriverLogin,
   onSave,
   onDelete,
+  isAdmin,
+  onRequestAdminLogin,
   rentalId,
   onRentalIdChange,
   onBack,
@@ -82,6 +84,8 @@ export default function RentalTripsPanel({
   onRequestDriverLogin: () => void;
   onSave: (t: RentalTrip) => Promise<unknown>;
   onDelete: (id: string) => Promise<unknown>;
+  isAdmin: boolean;
+  onRequestAdminLogin: () => void;
   rentalId: string; // 空なら全レンタカーの一覧、指定があればそのレンタカーの入力画面
   onRentalIdChange: (id: string) => void;
   onBack: () => void;
@@ -136,13 +140,14 @@ export default function RentalTripsPanel({
     });
   }
   function openEdit(t: RentalTrip) {
+    if (!isAdmin) return onRequestAdminLogin();
     guard(() => {
       setError('');
       setForm({ rec: { ...t }, pick: t.driverId && data.drivers.some((d) => d.id === t.driverId) ? t.driverId : OTHER });
     });
   }
   async function remove(t: RentalTrip) {
-    if (!currentDriver) return onRequestDriverLogin();
+    if (!isAdmin) return onRequestAdminLogin();
     if (!confirm(`${t.date} ${t.driver} の運行記録を削除しますか？`)) return;
     await onDelete(t.id);
   }
@@ -317,11 +322,11 @@ export default function RentalTripsPanel({
                         <td>{t.note || '-'}</td>
                         <td>
                           <div className="eactions">
-                            <button className="btn btn-sm" onClick={() => openEdit(t)}>
-                              編集
+                            <button className="btn btn-sm" onClick={() => openEdit(t)} title={isAdmin ? '' : '管理者ログインが必要です'}>
+                              {isAdmin ? '' : '🔒 '}編集
                             </button>
-                            <button className="btn btn-sm btn-danger" onClick={() => remove(t)}>
-                              削除
+                            <button className="btn btn-sm btn-danger" onClick={() => remove(t)} title={isAdmin ? '' : '管理者ログインが必要です'}>
+                              {isAdmin ? '' : '🔒 '}削除
                             </button>
                           </div>
                         </td>
