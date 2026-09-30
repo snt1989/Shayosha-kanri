@@ -1,7 +1,7 @@
 'use client';
 
 import { AppData, Driver, MAINT_URGENCIES, Reservation } from '@/lib/types';
-import { openMaintRequests, todayStr } from '@/lib/utils';
+import { openMaintRequests, rentalReservations, reservationRange, todayStr } from '@/lib/utils';
 import AlertsPanel from './AlertsPanel';
 import UsageCalendar from './UsageCalendar';
 
@@ -27,6 +27,10 @@ export default function DashboardTab({
     .filter((r) => !r.postDone)
     .sort((a, b) => (a.date + a.preTime).localeCompare(b.date + b.preTime));
   const maintRequests = openMaintRequests(data.reports);
+  // 利用中（返却前で期間が残っている）レンタカーと、そこに入っている予約
+  const activeRentals = data.rentals
+    .filter((n) => !n.returnedAt && n.endDate >= today)
+    .sort((a, b) => a.startDate.localeCompare(b.startDate));
 
   return (
     <div>
@@ -106,6 +110,38 @@ export default function DashboardTab({
           </div>
         )}
       </div>
+
+      {activeRentals.length > 0 && (
+        <div className="card" style={{ marginBottom: 14 }}>
+          <h3 className="card-title">
+            🚗 レンタカーの利用・予約状況
+            <span className="pill pill-amber" style={{ marginLeft: 8 }}>{activeRentals.length}台</span>
+          </h3>
+          <div className="alert-list">
+            {activeRentals.map((n) => {
+              const booked = rentalReservations(data.reservations, n.id, today);
+              return (
+                <div key={n.id} className="alert-item warn">
+                  <span>🚗</span>
+                  <div style={{ flex: 1 }}>
+                    <strong>{[n.company, n.carModel].filter(Boolean).join(' ')}</strong>
+                    {n.plate ? `（${n.plate}）` : ''}
+                    <span style={{ marginLeft: 8, fontSize: 12 }}>
+                      {n.startDate}〜{n.endDate}{n.startDate > today ? '（利用前）' : '（利用中）'}　登録者: {n.driver}
+                    </span>
+                    <div style={{ fontSize: 12, marginTop: 2 }}>
+                      {booked.length === 0
+                        ? '予約はまだありません'
+                        : booked.map((v) => `📅 ${reservationRange(v)} ${v.driver}${v.destination ? `（${v.destination}）` : ''}`).join('　／　')}
+                    </div>
+                  </div>
+                  {booked.length > 0 && <span className="pill pill-slate">予約{booked.length}件</span>}
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
 
       <UsageCalendar
         data={data}

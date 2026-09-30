@@ -49,3 +49,21 @@ export function openMaintRequests(reports: Report[]): Report[] {
         (a.date + a.preTime).localeCompare(b.date + b.preTime)
     );
 }
+
+// あるレンタカーに入っている予約（開始の早い順）。fromDate を渡すと、その日以降に終わるものだけ。
+export function rentalReservations(
+  reservations: { rentalId?: string; startDate: string; endDate: string; startTime: string; endTime: string; driver: string; destination: string; id: string }[],
+  rentalId: string,
+  fromDate?: string
+) {
+  return reservations
+    .filter((v) => v.rentalId === rentalId && (!fromDate || v.endDate >= fromDate))
+    .sort((a, b) => (a.startDate + a.startTime).localeCompare(b.startDate + b.startTime));
+}
+
+export function reservationRange(v: { startDate: string; endDate: string; startTime: string; endTime: string }): string {
+  const md = (d: string) => `${Number(d.slice(5, 7))}/${Number(d.slice(8, 10))}`;
+  return v.startDate === v.endDate
+    ? `${md(v.startDate)} ${v.startTime}〜${v.endTime}`
+    : `${md(v.startDate)} ${v.startTime}〜${md(v.endDate)} ${v.endTime}`;
+}

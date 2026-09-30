@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from 'react';
 import { AppData, Driver, Rental, RentalTrip } from '@/lib/types';
-import { todayStr } from '@/lib/utils';
+import { rentalReservations, reservationRange, todayStr } from '@/lib/utils';
 import { downloadCsv, rentalsToCsv } from '@/lib/csv';
 import Modal from './Modal';
 import RentalTripsPanel from './RentalTripsPanel';
@@ -60,7 +60,8 @@ export default function RentalTab({
   const [returnError, setReturnError] = useState('');
   const [error, setError] = useState('');
 
-  const month = todayStr().slice(0, 7);
+  const today = todayStr();
+  const month = today.slice(0, 7);
   const all = useMemo(
     () => [...data.rentals].sort((a, b) => (b.startDate + b.createdAt).localeCompare(a.startDate + a.createdAt)),
     [data.rentals]
@@ -260,13 +261,19 @@ export default function RentalTab({
                       {r.company}
                       <span className="cell-sub">{[r.carClass, r.carModel, r.plate].filter(Boolean).join(' / ') || '-'}</span>
                       {r.reservationNo && <span className="cell-sub">予約番号 {r.reservationNo}</span>}
+                      {rentalReservations(data.reservations, r.id, today).map((v) => (
+                        <span key={v.id} className="cell-sub" style={{ color: 'var(--sky-700, #0369a1)' }}>
+                          📅 予約 {reservationRange(v)} {v.driver}
+                          {v.destination ? `（${v.destination}）` : ''}
+                        </span>
+                      ))}
                       {r.returnedAt ? (
                         <span className="pill pill-green cell-sub-pill">
                           返却済 {r.returnedAt.slice(5).replace('-', '/')} {r.returnedTime || ''}
                           {r.returnedBy ? `　${r.returnedBy}` : ''}
                         </span>
                       ) : (
-                        <span className="pill pill-amber cell-sub-pill">利用中</span>
+                        <span className="pill pill-amber cell-sub-pill">{r.startDate > today ? '利用前' : '利用中'}</span>
                       )}
                     </td>
                     <td>

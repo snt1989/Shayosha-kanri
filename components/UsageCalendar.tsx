@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from 'react';
 import { AppData, Driver, Rental, Report, Reservation } from '@/lib/types';
-import { todayStr } from '@/lib/utils';
+import { rentalReservations, reservationRange, todayStr } from '@/lib/utils';
 import Modal from './Modal';
 
 // 車両ごとの色（背景 / 文字）。台帳の並び順で割り当てる。
@@ -417,6 +417,7 @@ export default function UsageCalendar({
               }
               if (e.kind === 'rental') {
                 const n = e.n;
+                const booked = rentalReservations(data.reservations, n.id).filter((v) => v.startDate <= selected && v.endDate >= selected);
                 const drivers = Array.from(new Set(data.rentalTrips.filter((t) => t.rentalId === n.id && t.date === selected).map((t) => t.driver)));
                 return (
                   <div key={`${n.id}-${selected}`} className="alert-item" style={plain}>
@@ -432,6 +433,11 @@ export default function UsageCalendar({
                         {n.plate ? `　${n.plate}` : ''}　登録者: {n.driver}
                         {drivers.length > 0 ? `　この日の運転者: ${drivers.join('・')}` : ''}
                       </div>
+                      {booked.length > 0 && (
+                        <div style={{ fontSize: 12, marginTop: 2 }}>
+                          📅 この日の予約: {booked.map((v) => `${reservationRange(v)} ${v.driver}`).join(' ／ ')}
+                        </div>
+                      )}
                     </div>
                   </div>
                 );
