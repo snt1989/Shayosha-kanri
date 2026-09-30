@@ -21,6 +21,12 @@ export async function POST(req: NextRequest) {
   if (r.endDate < r.startDate) {
     return NextResponse.json({ success: false, message: '返却日は利用開始日以降にしてください。' }, { status: 400 });
   }
+  r.operators = (Array.isArray(r.operators) ? r.operators : [])
+    .map((o) => ({ ...(o.driverId ? { driverId: o.driverId } : {}), name: String(o.name || '').trim() }))
+    .filter((o) => o.name);
+  if (r.status === '貸出中' && r.operators.length === 0) {
+    return NextResponse.json({ success: false, message: '運転する人を1人以上選んでください。' }, { status: 400 });
+  }
   r.estimateCost = num(r.estimateCost);
   r.cost = num(r.cost);
   r.startKm = num(r.startKm);
@@ -38,7 +44,7 @@ export async function POST(req: NextRequest) {
     actor: isAdminCookieValid(req.cookies.get(ADMIN_COOKIE)?.value) ? 'admin' : 'user',
     action: isNew || !prev ? 'レンタカー登録' : prev.status !== r.status ? `レンタカー${r.status}` : 'レンタカー更新',
     target: `${r.startDate} ${r.driver} / ${r.company}`,
-    detail: r.destination,
+    detail: [r.destination, r.operators.length ? `運転者: ${r.operators.map((o) => o.name).join('・')}` : ''].filter(Boolean).join(' / '),
   });
 
   await saveData({

@@ -131,6 +131,9 @@ export type Reservation = {
 export const RENTAL_STATUSES = ['予約済', '貸出中', '返却済', 'キャンセル'] as const;
 export type RentalStatus = (typeof RENTAL_STATUSES)[number];
 
+// レンタカーを実際に運転した人（利用者＝予約者とは別に、複数人を記録できる）
+export type RentalOperator = { driverId?: string; name: string };
+
 // レンタカーの利用記録（社用車とは別管理）
 export type Rental = {
   id: string;
@@ -143,6 +146,7 @@ export type Rental = {
   driverId?: string;
   driver: string;
   dept: string;
+  operators?: RentalOperator[]; // 運転した人（運転者台帳から選ぶ＋台帳にない人）
   purpose: string;
   destination: string;
   startDate: string;

@@ -1,8 +1,8 @@
 'use client';
 
 import { useMemo, useState } from 'react';
-import { AppData, Driver, RENTAL_STATUSES, Rental, RentalStatus } from '@/lib/types';
-import { todayStr } from '@/lib/utils';
+import { AppData, Driver, RENTAL_STATUSES, Rental, RentalOperator, RentalStatus } from '@/lib/types';
+import { daysUntil, todayStr } from '@/lib/utils';
 import { downloadCsv, rentalsToCsv } from '@/lib/csv';
 import Modal from './Modal';
 
@@ -27,6 +27,7 @@ const emptyRental = (data: AppData, d: Driver | null): Rental => ({
   driverId: d?.id,
   driver: d ? `${d.lastName} ${d.firstName}` : '',
   dept: d?.dept || '',
+  operators: [],
   purpose: '',
   destination: '',
   startDate: todayStr(),
@@ -102,7 +103,10 @@ export default function RentalTab({
   function openMode(r: Rental, mode: Mode) {
     guard(() => {
       setError('');
-      setForm({ rec: { ...r }, mode });
+      const rec = { ...r, operators: [...(r.operators || [])] };
+      // 貸出開始のとき、運転者が未記録なら予約者本人を初期値にする
+      if (mode === 'start' && rec.operators.length === 0 && rec.driver) rec.operators = [{ driverId: rec.driverId, name: rec.driver }];
+      setForm({ rec, mode });
     });
   }
   async function remove(r: Rental) {
@@ -120,6 +124,7 @@ export default function RentalTab({
     const next: Rental = { ...rec };
     if (mode === 'start') {
       if (!rec.plate.trim()) return setError('借りた車のナンバーを入力してください。');
+      if (!(rec.operators || []).length) return setError('運転する人を1人以上選んでください。');
       next.status = '貸出中';
     }
     if (mode === 'return') {
@@ -140,6 +145,28 @@ export default function RentalTab({
 
   const set = <K extends keyof Rental>(k: K, v: Rental[K]) => form && setForm({ ...form, rec: { ...form.rec, [k]: v } });
   const numIn = (v: string) => (v === '' ? 0 : Math.max(0, Number(v) || 0));
+
+  const ops = form?.rec.operators || [];
+  const isChecked = (d: Driver) => ops.some((o) => o.driverId === d.id);
+  function toggleOp(d: Driver) {
+    const name = `${d.lastName} ${d.firstName}`;
+    set('operators', isChecked(d) ? ops.filter((o) => o.driverId !== d.id) : [...ops, { driverId: d.id, name }]);
+  }
+  const extraOps = ops.filter((o) => !o.driverId);
+  const [extraName, setExtraName] = useState('');
+  function addExtra() {
+    const n = extraName.trim();
+    if (!n || ops.some((o) => o.name === n)) return;
+    set('operators', [...ops, { name: n } as RentalOperator]);
+    setExtraName('');
+  }
+  const licenseWarn = (d: Driver) => {
+    const days = daysUntil(d.licenseExpiry);
+    if (days === null) return '免許期限 未設定';
+    if (days < 0) return '免許期限切れ';
+    if (days <= 30) return `免許あと${days}日`;
+    return '';
+  };
 
   const rec = form?.rec;
   const showStart = form && (form.mode !== 'edit' || (rec && rec.status !== '予約済' && rec.status !== 'キャンセル'));
@@ -221,7 +248,8 @@ export default function RentalTab({
                 <tr>
                   <th>利用期間</th>
                   <th>レンタカー</th>
-                  <th>利用者</th>
+                  <th>利用者（予約者）</th>
+                  <th>運転した人</th>
                   <th>行先・用件</th>
                   <th>金額</th>
                   <th>状態</th>
@@ -245,6 +273,15 @@ export default function RentalTab({
                     <td>
                       {r.driver}
                       <span className="cell-sub">{r.dept}</span>
+                    </td>
+                    <td>
+                      {(r.operators || []).length === 0 ? (
+                        <span style={{ color: 'var(--slate-400)' }}>{r.status === '予約済' || r.status === 'キャンセル' ? '-' : '未記録'}</span>
+                      ) : (
+                        (r.operators || []).map((o, i) => (
+                          <div key={i}>{o.name}</div>
+                        ))
+                      )}
                     </td>
                     <td>
                       {r.destination || '-'}
@@ -385,6 +422,51 @@ export default function RentalTab({
                     ))}
                   </select>
                 </div>
+              </div>
+            </>
+          )}
+
+          {form && (form.mode !== 'edit' || showStart) && (
+            <>
+              <div className="section-heading">運転した人（運転する人）</div>
+              <div style={{ fontSize: 12, color: 'var(--slate-500)', marginBottom: 6 }}>
+                運転者台帳から選んでください（複数可）。台帳にない人は下の欄から名前で追加できます。
+              </div>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginBottom: 8 }}>
+                {data.drivers.map((d) => {
+                  const warn = licenseWarn(d);
+                  return (
+                    <label key={d.id} className="btn btn-sm" style={{ display: 'inline-flex', gap: 6, alignItems: 'center', cursor: 'pointer', background: isChecked(d) ? 'var(--green-100)' : undefined }}>
+                      <input type="checkbox" checked={isChecked(d)} onChange={() => toggleOp(d)} style={{ width: 'auto' }} />
+                      {d.lastName} {d.firstName}
+                      {warn && <span className="pill pill-red">{warn}</span>}
+                    </label>
+                  );
+                })}
+              </div>
+              {extraOps.length > 0 && (
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 8 }}>
+                  {extraOps.map((o) => (
+                    <span key={o.name} className="pill pill-slate">
+                      {o.name}（台帳外）
+                      <button style={{ marginLeft: 4, border: 0, background: 'none', cursor: 'pointer' }} onClick={() => set('operators', ops.filter((x) => x !== o))}>
+                        ×
+                      </button>
+                    </span>
+                  ))}
+                </div>
+              )}
+              <div style={{ display: 'flex', gap: 6, marginBottom: 6 }}>
+                <input
+                  value={extraName}
+                  placeholder="台帳にない人の名前（例: ○○商事 佐藤）"
+                  onChange={(e) => setExtraName(e.target.value)}
+                  onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); addExtra(); } }}
+                  style={{ flex: 1, padding: '8px 10px', border: '1px solid var(--slate-300)', borderRadius: 8 }}
+                />
+                <button className="btn btn-sm" onClick={addExtra} disabled={!extraName.trim()}>
+                  追加
+                </button>
               </div>
             </>
           )}
