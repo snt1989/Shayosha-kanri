@@ -1,13 +1,27 @@
 'use client';
 
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { AppData, Driver, Report } from '@/lib/types';
+import { AppData, Driver, Report, Vehicle } from '@/lib/types';
 import { genId, nowTimeStr, todayStr } from '@/lib/utils';
 import { downloadCsv } from '@/lib/csv';
 import { extractOdometerReading, loadTesseract } from '@/lib/ocr';
 import Modal from './Modal';
 
-const emptyReport = (data: AppData, currentDriver?: Driver | null): Report => ({
+// 「前回使った車両」: 運転者が分かればその人の直近の日報、なければ全体で直近の日報の車両。
+// 台帳から削除済みの車両は対象外。data.reports は新しい順に保存されている。
+const lastUsedVehicle = (data: AppData, driverId?: string): Vehicle | undefined => {
+  const exists = (id: string) => data.vehicles.find((v) => v.id === id);
+  if (driverId) {
+    const mine = data.reports.find((r) => r.driverId === driverId && r.vehicleId && exists(r.vehicleId));
+    if (mine) return exists(mine.vehicleId);
+  }
+  const any = data.reports.find((r) => r.vehicleId && exists(r.vehicleId));
+  return any ? exists(any.vehicleId) : undefined;
+};
+
+const emptyReport = (data: AppData, currentDriver?: Driver | null): Report => {
+  const lastVehicle = lastUsedVehicle(data, currentDriver?.id);
+  return {
   id: '',
   date: todayStr(),
   dept: currentDriver?.dept || data.masters.departments[0] || '',
@@ -15,9 +29,9 @@ const emptyReport = (data: AppData, currentDriver?: Driver | null): Report => ({
   driverLast: currentDriver?.lastName || '',
   driverFirst: currentDriver?.firstName || '',
   driver: currentDriver ? `${currentDriver.lastName} ${currentDriver.firstName}`.trim() : '',
-  vehicleId: '',
-  vehicleName: '',
-  plate: '',
+  vehicleId: lastVehicle?.id || '',
+  vehicleName: lastVehicle?.name || '',
+  plate: lastVehicle?.plate || '',
   destination: '',
   purpose: '',
   preTime: nowTimeStr(),
@@ -32,12 +46,13 @@ const emptyReport = (data: AppData, currentDriver?: Driver | null): Report => ({
   postAlcohol: '0.00',
   postChecker: '',
   postMethod: '',
-  startKm: 0,
+  startKm: lastVehicle?.odometer || 0,
   endKm: 0,
   tripKm: 0,
   notes: '',
   inspectionPhoto: '',
-});
+  };
+};
 
 const emptyQuickDriver = (data: AppData): Driver => ({
   id: '',
@@ -177,7 +192,20 @@ export default function ReportsTab({
       setEditing({ ...editing, driverId: '', driverLast: '', driverFirst: '', dept: editing.dept });
       return;
     }
-    setEditing({ ...editing, driverId: d.id, driverLast: d.lastName, driverFirst: d.firstName, dept: d.dept || editing.dept });
+    const next = { ...editing, driverId: d.id, driverLast: d.lastName, driverFirst: d.firstName, dept: d.dept || editing.dept };
+    // 新規の出発登録で、車両が未選択か「前回車両の自動設定のまま」のときだけ、選んだ運転者の前回車両に切り替える
+    if (!editing.id) {
+      const prevDefault = lastUsedVehicle(data, editing.driverId || undefined);
+      const untouched = !editing.vehicleId || editing.vehicleId === prevDefault?.id;
+      const v = lastUsedVehicle(data, d.id);
+      if (untouched && v) {
+        next.vehicleId = v.id;
+        next.vehicleName = v.name;
+        next.plate = v.plate;
+        next.startKm = v.odometer;
+      }
+    }
+    setEditing(next);
   }
 
   async function handleQuickDriverSave() {
@@ -725,7 +753,7 @@ export default function ReportsTab({
             </div>
           </div>
           <div style={{ fontSize: 11.5, color: 'var(--slate-500)' }}>
-            簡易登録です。免許証番号など詳細情報は「運転者台帳・免許」タブからいつでも追記できます。
+            簡易登録です。免許証番号など詳細情報は「運転者台帳」タブからいつでも追記できます。
           </div>
         </Modal>
       )}
