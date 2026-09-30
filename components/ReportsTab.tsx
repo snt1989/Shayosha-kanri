@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { AppData, Driver, Report, Vehicle } from '@/lib/types';
+import { AppData, Driver, MAINT_URGENCIES, Report, Vehicle } from '@/lib/types';
 import { genId, nowTimeStr, todayStr } from '@/lib/utils';
 import { downloadCsv } from '@/lib/csv';
 import { extractOdometerReading, loadTesseract } from '@/lib/ocr';
@@ -68,7 +68,7 @@ const emptyQuickDriver = (data: AppData): Driver => ({
 });
 
 function reportsToCsv(reports: Report[]): string {
-  const headers = ['日付', '運転者', '使用車両', '行先・用件', '運転前ALC', '運転後ALC', '出発km', '帰着km', '実走行km', 'ステータス', '特記事項'];
+  const headers = ['日付', '運転者', '使用車両', '行先・用件', '運転前ALC', '運転後ALC', '出発km', '帰着km', '実走行km', 'ステータス', '整備依頼', '特記事項'];
   const esc = (v: unknown) => {
     const s = String(v ?? '');
     return /[",\n\r]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s;
@@ -85,6 +85,9 @@ function reportsToCsv(reports: Report[]): string {
       r.postDone ? r.endKm : '',
       r.postDone ? r.tripKm : '',
       r.postDone ? '帰着済' : '出庫中',
+      r.maintRequest
+        ? `${r.maintRequestType || ''}（${r.maintRequestUrgency || '通常'}）${r.maintRequestNote ? ' ' + r.maintRequestNote : ''}`.trim()
+        : '',
       r.notes,
     ]
       .map(esc)
@@ -288,11 +291,18 @@ export default function ReportsTab({
       alert('運転者（姓・名）・車両・行先は必須です。');
       return;
     }
+    if (editing.postDone && editing.maintRequest && !(editing.maintRequestNote || '').trim()) {
+      alert('整備依頼の内容・症状を入力してください。');
+      return;
+    }
     const tripKm = editing.postDone ? Math.max(0, (editing.endKm || 0) - (editing.startKm || 0)) : 0;
     const driver = `${editing.driverLast} ${editing.driverFirst}`.trim();
     setSaving(true);
     try {
-      await onSave({ ...editing, driver, tripKm });
+      const maint = editing.maintRequest
+        ? {}
+        : { maintRequest: false, maintRequestType: '', maintRequestUrgency: '', maintRequestNote: '' };
+      await onSave({ ...editing, ...maint, driver, tripKm });
       setEditing(null);
     } finally {
       setSaving(false);
@@ -410,6 +420,14 @@ export default function ReportsTab({
                     </td>
                     <td>
                       {r.postDone ? <span className="pill pill-green">帰着済</span> : <span className="pill pill-amber">出庫中</span>}
+                      {r.maintRequest && (
+                        <span
+                          className="pill pill-red cell-sub-pill"
+                          title={`${r.maintRequestType || ''} / ${r.maintRequestNote || ''}`}
+                        >
+                          🔧 整備依頼{r.maintRequestUrgency && r.maintRequestUrgency !== '通常' ? `（${r.maintRequestUrgency}）` : ''}
+                        </span>
+                      )}
                     </td>
                     <td>
                       <button className="btn btn-sm" onClick={() => openEdit(r)}>
@@ -683,6 +701,60 @@ export default function ReportsTab({
                   </button>
                 </div>
               </div>
+
+              <div className="section-heading">整備依頼</div>
+              <div className="field">
+                <label className="checkbox-field">
+                  <input
+                    type="checkbox"
+                    checked={!!editing.maintRequest}
+                    onChange={(e) =>
+                      setEditing({
+                        ...editing,
+                        maintRequest: e.target.checked,
+                        maintRequestType: editing.maintRequestType || data.masters.maintTypes[0] || '',
+                        maintRequestUrgency: editing.maintRequestUrgency || MAINT_URGENCIES[0],
+                      })
+                    }
+                  />
+                  この車両の整備を依頼する（不具合・点検・消耗品交換など）
+                </label>
+              </div>
+              {editing.maintRequest && (
+                <>
+                  <div className="field-row-4">
+                    <div className="field">
+                      <label>整備種別</label>
+                      <select value={editing.maintRequestType || ''} onChange={(e) => setEditing({ ...editing, maintRequestType: e.target.value })}>
+                        {data.masters.maintTypes.map((t) => (
+                          <option key={t} value={t}>
+                            {t}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                    <div className="field">
+                      <label>緊急度</label>
+                      <select value={editing.maintRequestUrgency || MAINT_URGENCIES[0]} onChange={(e) => setEditing({ ...editing, maintRequestUrgency: e.target.value })}>
+                        {MAINT_URGENCIES.map((u) => (
+                          <option key={u} value={u}>
+                            {u}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  </div>
+                  <div className="field">
+                    <label>依頼内容・症状</label>
+                    <textarea
+                      rows={2}
+                      placeholder="例: ブレーキから異音がする / 警告灯が点灯した / オイル交換の時期"
+                      value={editing.maintRequestNote || ''}
+                      onChange={(e) => setEditing({ ...editing, maintRequestNote: e.target.value })}
+                    />
+                  </div>
+                </>
+              )}
             </>
           )}
 

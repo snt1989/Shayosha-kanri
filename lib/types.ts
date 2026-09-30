@@ -38,7 +38,14 @@ export type Report = {
   tripKm: number;
   notes: string;
   inspectionPhoto?: string;
+  // 帰着登録時の整備依頼（既存の日報には無いので optional）
+  maintRequest?: boolean;
+  maintRequestType?: string;
+  maintRequestUrgency?: string;
+  maintRequestNote?: string;
 };
+
+export const MAINT_URGENCIES = ['通常', '早めに', '至急（使用不可）'] as const;
 
 export type Vehicle = {
   id: string;
