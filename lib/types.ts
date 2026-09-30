@@ -43,6 +43,9 @@ export type Report = {
   maintRequestType?: string;
   maintRequestUrgency?: string;
   maintRequestNote?: string;
+  // 整備台帳で対応を記録すると true（対応待ち → 対応済）
+  maintRequestDone?: boolean;
+  maintRequestDoneAt?: string;
 };
 
 export const MAINT_URGENCIES = ['通常', '早めに', '至急（使用不可）'] as const;

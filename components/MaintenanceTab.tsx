@@ -1,8 +1,8 @@
 'use client';
 
 import { useMemo, useState } from 'react';
-import { AppData, MaintRecord, Vehicle } from '@/lib/types';
-import { todayStr } from '@/lib/utils';
+import { AppData, MAINT_URGENCIES, MaintRecord, Report, Vehicle } from '@/lib/types';
+import { openMaintRequests, todayStr } from '@/lib/utils';
 import { downloadCsv, maintenanceToCsv } from '@/lib/csv';
 import Modal from './Modal';
 
@@ -19,6 +19,7 @@ type Editing = {
   vehicleId: string;
   index: number | null; // null は新規追加
   rec: MaintRecord;
+  requestId?: string; // 整備依頼への対応として登録するとき、その日報のid
 };
 
 const yen = (n?: number) => (n === undefined || n === null || Number.isNaN(n) ? '-' : `${n.toLocaleString()} 円`);
@@ -26,9 +27,11 @@ const yen = (n?: number) => (n === undefined || n === null || Number.isNaN(n) ? 
 export default function MaintenanceTab({
   data,
   onSave,
+  onResolveRequest,
 }: {
   data: AppData;
   onSave: (v: Vehicle) => Promise<unknown>;
+  onResolveRequest: (reportId: string, done: boolean) => Promise<unknown>;
 }) {
   const [query, setQuery] = useState('');
   const [vehicleFilter, setVehicleFilter] = useState('');
@@ -66,6 +69,8 @@ export default function MaintenanceTab({
     });
   }, [allRows, query, vehicleFilter, typeFilter]);
 
+  const requests = useMemo(() => openMaintRequests(data.reports), [data.reports]);
+
   const totalCost = rows.reduce((sum, r) => sum + (r.cost || 0), 0);
   const thisYear = todayStr().slice(0, 4);
   const thisYearCount = rows.filter((r) => r.date.startsWith(thisYear)).length;
@@ -77,6 +82,27 @@ export default function MaintenanceTab({
       index: null,
       rec: { date: todayStr(), type: '', km: v?.odometer || 0, note: '', cost: undefined, shop: '' },
     });
+  }
+  // 整備依頼を請けて、依頼の内容を引き継いだ整備記録の登録画面を開く
+  function openFromRequest(r: Report) {
+    const v = data.vehicles.find((x) => x.id === r.vehicleId);
+    if (!v) return;
+    setEditing({
+      vehicleId: v.id,
+      index: null,
+      requestId: r.id,
+      rec: {
+        date: todayStr(),
+        type: typeOptions.includes(r.maintRequestType || '') ? (r.maintRequestType as string) : '',
+        km: r.endKm || v.odometer || 0,
+        note: `【依頼】${r.maintRequestNote || ''}（${r.driver} ${r.date}）`,
+        cost: undefined,
+        shop: '',
+      },
+    });
+  }
+  async function closeRequestWithoutRecord(r: Report) {
+    await onResolveRequest(r.id, true);
   }
   function openEdit(r: LedgerRow) {
     setEditing({
@@ -123,6 +149,7 @@ export default function MaintenanceTab({
     setSaving(true);
     try {
       await onSave({ ...v, maintHistory: list });
+      if (editing.requestId) await onResolveRequest(editing.requestId, true);
       setEditing(null);
     } finally {
       setSaving(false);
@@ -146,6 +173,49 @@ export default function MaintenanceTab({
 
   return (
     <div>
+      {requests.length > 0 && (
+        <div className="card" style={{ marginBottom: 14 }}>
+          <h3 className="card-title">
+            🛠 整備依頼（対応待ち）<span className="pill pill-red" style={{ marginLeft: 8 }}>{requests.length}件</span>
+          </h3>
+          <div style={{ fontSize: 12, color: 'var(--slate-500)', marginBottom: 8 }}>
+            帰着登録で受け付けた依頼です。整備を実施したら「整備記録として登録」で台帳に残すと、対応済になります。
+          </div>
+          <div className="alert-list">
+            {requests.map((r) => {
+              const urgent = r.maintRequestUrgency === MAINT_URGENCIES[2];
+              const vehicleExists = data.vehicles.some((v) => v.id === r.vehicleId);
+              return (
+                <div key={r.id} className={`alert-item ${urgent ? 'danger' : 'warn'}`}>
+                  <span>🔧</span>
+                  <div style={{ flex: 1 }}>
+                    <strong>{r.vehicleName}</strong>
+                    {r.plate ? `（${r.plate}）` : ''}— {r.maintRequestType || '整備'}
+                    {r.maintRequestUrgency && r.maintRequestUrgency !== MAINT_URGENCIES[0] && (
+                      <span className={`pill ${urgent ? 'pill-red' : 'pill-amber'}`} style={{ marginLeft: 6 }}>
+                        {r.maintRequestUrgency}
+                      </span>
+                    )}
+                    <div style={{ fontSize: 12, marginTop: 2 }}>
+                      {r.maintRequestNote}　依頼: {r.date} {r.driver}
+                      {!vehicleExists && '（車両は台帳から削除済み）'}
+                    </div>
+                  </div>
+                  <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                    <button className="btn btn-sm btn-primary" onClick={() => openFromRequest(r)} disabled={!vehicleExists}>
+                      整備記録として登録
+                    </button>
+                    <button className="btn btn-sm" onClick={() => closeRequestWithoutRecord(r)}>
+                      記録せず完了にする
+                    </button>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
       <div className="card">
         <div className="toolbar2">
           <div>
@@ -259,7 +329,7 @@ export default function MaintenanceTab({
 
       {editing && (
         <Modal
-          title={editing.index === null ? '整備記録を追加' : '整備記録を編集'}
+          title={editing.requestId ? '整備依頼への対応を記録' : editing.index === null ? '整備記録を追加' : '整備記録を編集'}
           onClose={() => setEditing(null)}
           footer={
             <>

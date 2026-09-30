@@ -123,6 +123,9 @@ export default function FleetApp() {
       throw e;
     }
   }
+  async function resolveMaintRequest(id: string, done: boolean) {
+    return withSync(() => jsonFetch(`/api/reports/${id}/maint-request`, { method: 'POST', body: JSON.stringify({ done }) }));
+  }
   async function saveVehicle(v: Vehicle) {
     return withSync(() => jsonFetch('/api/vehicles', { method: 'POST', body: JSON.stringify(v) }));
   }
@@ -277,7 +280,9 @@ export default function FleetApp() {
       </div>
 
       <main className="main">
-        {tab === 'dashboard' && <DashboardTab data={data} onReturnCheckin={handleReturnCheckin} />}
+        {tab === 'dashboard' && (
+          <DashboardTab data={data} onReturnCheckin={handleReturnCheckin} onOpenMaintenance={() => setTab('maintenance')} />
+        )}
         {tab === 'reports' && (
           <ReportsTab
             data={data}
@@ -296,7 +301,7 @@ export default function FleetApp() {
         {tab === 'vehicles' && (
           <VehiclesTab data={data} onSave={saveVehicle} onDelete={deleteVehicle} onBulkSave={bulkSaveVehicles} />
         )}
-        {tab === 'maintenance' && <MaintenanceTab data={data} onSave={saveVehicle} />}
+        {tab === 'maintenance' && <MaintenanceTab data={data} onSave={saveVehicle} onResolveRequest={resolveMaintRequest} />}
         {tab === 'drivers' && (
           <DriversTab data={data} onSave={saveDriver} onDelete={deleteDriver} onBulkSave={bulkSaveDrivers} />
         )}

@@ -86,7 +86,7 @@ function reportsToCsv(reports: Report[]): string {
       r.postDone ? r.tripKm : '',
       r.postDone ? '帰着済' : '出庫中',
       r.maintRequest
-        ? `${r.maintRequestType || ''}（${r.maintRequestUrgency || '通常'}）${r.maintRequestNote ? ' ' + r.maintRequestNote : ''}`.trim()
+        ? `${r.maintRequestDone ? '対応済 ' : '対応待ち '}${r.maintRequestType || ''}（${r.maintRequestUrgency || '通常'}）${r.maintRequestNote ? ' ' + r.maintRequestNote : ''}`.trim()
         : '',
       r.notes,
     ]
@@ -301,7 +301,7 @@ export default function ReportsTab({
     try {
       const maint = editing.maintRequest
         ? {}
-        : { maintRequest: false, maintRequestType: '', maintRequestUrgency: '', maintRequestNote: '' };
+        : { maintRequest: false, maintRequestType: '', maintRequestUrgency: '', maintRequestNote: '', maintRequestDone: false, maintRequestDoneAt: '' };
       await onSave({ ...editing, ...maint, driver, tripKm });
       setEditing(null);
     } finally {
@@ -422,10 +422,15 @@ export default function ReportsTab({
                       {r.postDone ? <span className="pill pill-green">帰着済</span> : <span className="pill pill-amber">出庫中</span>}
                       {r.maintRequest && (
                         <span
-                          className="pill pill-red cell-sub-pill"
+                          className={`pill ${r.maintRequestDone ? 'pill-green' : 'pill-red'} cell-sub-pill`}
                           title={`${r.maintRequestType || ''} / ${r.maintRequestNote || ''}`}
                         >
-                          🔧 整備依頼{r.maintRequestUrgency && r.maintRequestUrgency !== '通常' ? `（${r.maintRequestUrgency}）` : ''}
+                          🔧 整備依頼
+                          {r.maintRequestDone
+                            ? '（対応済）'
+                            : r.maintRequestUrgency && r.maintRequestUrgency !== '通常'
+                            ? `（${r.maintRequestUrgency}）`
+                            : ''}
                         </span>
                       )}
                     </td>
