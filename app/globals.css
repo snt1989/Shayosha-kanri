@@ -1289,3 +1289,13 @@ table.bulk-grid {
   color: var(--slate-500);
   align-self: center;
 }
+
+/* 社用車台帳カードの操作ボタン */
+.entity-card .efoot {
+  flex-wrap: wrap;
+}
+.entity-card .eactions {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}

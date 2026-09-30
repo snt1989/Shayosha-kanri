@@ -2,7 +2,7 @@
 
 import { useMemo, useRef, useState } from 'react';
 import { AppData, MaintRecord, Vehicle } from '@/lib/types';
-import { daysUntil, genId, todayStr } from '@/lib/utils';
+import { daysUntil, genId, openMaintRequests, todayStr } from '@/lib/utils';
 import { csvToVehicles, downloadCsv, vehiclesToCsv } from '@/lib/csv';
 import Modal from './Modal';
 
@@ -36,7 +36,15 @@ export default function VehiclesTab({
   const [newMaint, setNewMaint] = useState<Partial<MaintRecord>>({});
   const [bulkRows, setBulkRows] = useState<Vehicle[] | null>(null);
   const [bulkSaving, setBulkSaving] = useState(false);
+  // 各車両の「整備記録」「運転記録」を一覧で見る画面
+  const [viewing, setViewing] = useState<{ vehicleId: string; kind: 'maint' | 'drive' } | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
+
+  const driveCounts = useMemo(() => {
+    const map = new Map<string, number>();
+    data.reports.forEach((r) => map.set(r.vehicleId, (map.get(r.vehicleId) || 0) + 1));
+    return map;
+  }, [data.reports]);
 
   const filtered = useMemo(() => {
     const q = query.trim();
@@ -187,6 +195,17 @@ export default function VehiclesTab({
     downloadCsv(`車両台帳_${todayStr()}.csv`, vehiclesToCsv(data.vehicles).replace(/^﻿/, ''));
   }
 
+  // 「整備記録」「運転記録」の一覧に使うデータ
+  const viewVehicle = viewing ? data.vehicles.find((x) => x.id === viewing.vehicleId) : undefined;
+  const maintRows = viewVehicle ? [...viewVehicle.maintHistory].sort((a, b) => (a.date < b.date ? 1 : a.date > b.date ? -1 : 0)) : [];
+  const maintCost = maintRows.reduce((sum, m) => sum + (m.cost || 0), 0);
+  const maintRequests = viewVehicle ? openMaintRequests(data.reports).filter((r) => r.vehicleId === viewVehicle.id) : [];
+  const driveRows = viewVehicle
+    ? data.reports.filter((r) => r.vehicleId === viewVehicle.id).sort((a, b) => (b.date + b.preTime).localeCompare(a.date + a.preTime))
+    : [];
+  const driveKm = driveRows.reduce((sum, r) => sum + (r.postDone ? r.tripKm || 0 : 0), 0);
+  const driveOut = driveRows.filter((r) => !r.postDone).length;
+
   return (
     <div>
       <div className="card">
@@ -261,9 +280,17 @@ export default function VehiclesTab({
                     </div>
                   </div>
                   <div className="efoot">
-                    <button className="btn btn-sm" onClick={() => openEdit(v)}>
-                      📝 点検・整備記録
-                    </button>
+                    <div className="eactions">
+                      <button className="btn btn-sm btn-primary" onClick={() => openEdit(v)}>
+                        ✏️ 編集
+                      </button>
+                      <button className="btn btn-sm" onClick={() => setViewing({ vehicleId: v.id, kind: 'maint' })}>
+                        🔧 整備記録（{v.maintHistory.length}）
+                      </button>
+                      <button className="btn btn-sm" onClick={() => setViewing({ vehicleId: v.id, kind: 'drive' })}>
+                        📋 運転記録（{driveCounts.get(v.id) || 0}）
+                      </button>
+                    </div>
                     <span className="eid">{v.id}</span>
                     <button className="btn btn-sm btn-danger" onClick={() => handleDelete(v.id)}>
                       削除
@@ -275,6 +302,158 @@ export default function VehiclesTab({
           </div>
         )}
       </div>
+
+      {viewing && viewVehicle && viewing.kind === 'maint' && (
+        <Modal
+          wide
+          title={`🔧 整備記録 — ${viewVehicle.name}`}
+          onClose={() => setViewing(null)}
+          footer={
+            <>
+              <button className="btn" onClick={() => setViewing(null)}>
+                閉じる
+              </button>
+              <button
+                className="btn btn-primary"
+                onClick={() => {
+                  setViewing(null);
+                  openEdit(viewVehicle);
+                }}
+              >
+                ✏️ 車両情報・整備記録を編集
+              </button>
+            </>
+          }
+        >
+          <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap', fontSize: 13, color: 'var(--slate-600)', marginBottom: 10 }}>
+            <span>{viewVehicle.plate}</span>
+            <span>全{maintRows.length}件</span>
+            <span>費用合計 {maintCost.toLocaleString()} 円</span>
+            <span>現在の走行距離 {viewVehicle.odometer.toLocaleString()} km</span>
+          </div>
+          {maintRequests.length > 0 && (
+            <div style={{ marginBottom: 12 }}>
+              <div style={{ fontWeight: 700, fontSize: 13, marginBottom: 6 }}>
+                整備依頼（対応待ち）<span className="pill pill-red" style={{ marginLeft: 6 }}>{maintRequests.length}件</span>
+              </div>
+              <div className="alert-list">
+                {maintRequests.map((r) => (
+                  <div key={r.id} className={`alert-item ${r.maintRequestUrgency === '至急（使用不可）' ? 'danger' : 'warn'}`}>
+                    <span>🔧</span>
+                    <div style={{ flex: 1 }}>
+                      <strong>{r.maintRequestType || '整備'}</strong>
+                      {r.maintRequestUrgency && r.maintRequestUrgency !== '通常' && (
+                        <span className="pill pill-amber" style={{ marginLeft: 6 }}>{r.maintRequestUrgency}</span>
+                      )}
+                      <div style={{ fontSize: 12, marginTop: 2 }}>
+                        {r.maintRequestNote}　依頼: {r.date} {r.driver}
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+          {maintRows.length === 0 ? (
+            <div className="empty-state">この車両の整備記録はまだありません</div>
+          ) : (
+            <div className="table-wrap">
+              <table className="data-table">
+                <thead>
+                  <tr>
+                    <th>実施日</th>
+                    <th>整備種別</th>
+                    <th>走行km</th>
+                    <th>費用</th>
+                    <th>実施先</th>
+                    <th>備考</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {maintRows.map((m, i) => (
+                    <tr key={`${m.date}-${i}`}>
+                      <td>{m.date}</td>
+                      <td>
+                        <span className="pill pill-slate">{m.type}</span>
+                      </td>
+                      <td>{m.km ? m.km.toLocaleString() : '-'}</td>
+                      <td>{m.cost === undefined ? '-' : `${m.cost.toLocaleString()} 円`}</td>
+                      <td>{m.shop || '-'}</td>
+                      <td>{m.note}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </Modal>
+      )}
+
+      {viewing && viewVehicle && viewing.kind === 'drive' && (
+        <Modal
+          wide
+          title={`📋 運転記録 — ${viewVehicle.name}`}
+          onClose={() => setViewing(null)}
+          footer={
+            <button className="btn" onClick={() => setViewing(null)}>
+              閉じる
+            </button>
+          }
+        >
+          <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap', fontSize: 13, color: 'var(--slate-600)', marginBottom: 10 }}>
+            <span>{viewVehicle.plate}</span>
+            <span>全{driveRows.length}件</span>
+            <span>実走行合計 {driveKm.toLocaleString()} km</span>
+            {driveOut > 0 && <span className="pill pill-amber">出庫中 {driveOut}件</span>}
+          </div>
+          {driveRows.length === 0 ? (
+            <div className="empty-state">この車両の運転記録はまだありません</div>
+          ) : (
+            <div className="table-wrap">
+              <table className="data-table">
+                <thead>
+                  <tr>
+                    <th>日付</th>
+                    <th>運転者</th>
+                    <th>行先・用件</th>
+                    <th>出発〜帰着</th>
+                    <th>メーター（実走行）</th>
+                    <th>状態</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {driveRows.map((r) => (
+                    <tr key={r.id}>
+                      <td>{r.date}</td>
+                      <td>{r.driver}</td>
+                      <td>
+                        {r.destination}
+                        {r.purpose && <span className="cell-sub">{r.purpose}</span>}
+                      </td>
+                      <td>
+                        {r.preTime}〜{r.postDone ? r.postTime : ''}
+                      </td>
+                      <td>
+                        {r.postDone
+                          ? `${r.startKm.toLocaleString()}→${r.endKm.toLocaleString()}km（${r.tripKm}km）`
+                          : `${r.startKm.toLocaleString()}km〜`}
+                      </td>
+                      <td>
+                        {r.postDone ? <span className="pill pill-green">帰着済</span> : <span className="pill pill-amber">出庫中</span>}
+                        {r.maintRequest && (
+                          <span className={`pill ${r.maintRequestDone ? 'pill-green' : 'pill-red'} cell-sub-pill`}>
+                            🔧 整備依頼{r.maintRequestDone ? '（対応済）' : ''}
+                          </span>
+                        )}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </Modal>
+      )}
 
       {editing && (
         <Modal
