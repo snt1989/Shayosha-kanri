@@ -128,39 +128,28 @@ export type Reservation = {
   createdAt: string;
 };
 
-export const RENTAL_STATUSES = ['予約済', '貸出中', '返却済', 'キャンセル'] as const;
-export type RentalStatus = (typeof RENTAL_STATUSES)[number];
-
 // レンタカーを実際に運転した人（利用者＝予約者とは別に、複数人を記録できる）
 export type RentalOperator = { driverId?: string; name: string };
 
 // レンタカーの利用記録（社用車とは別管理）
 export type Rental = {
   id: string;
-  status: RentalStatus;
   company: string; // レンタカー会社
   carClass: string; // 車種クラス
   carModel: string; // 車種（例: ヤリス）
-  plate: string; // 借りた車のナンバー（貸出時に判明）
-  reservationNo: string; // 予約番号
-  driverId?: string;
+  plate: string; // 借りた車のナンバー
+  reservationNo: string; // 予約番号（レンタカー会社の控え）
+  driverId?: string; // 登録した人
   driver: string;
   dept: string;
-  operators?: RentalOperator[]; // 運転した人（運転者台帳から選ぶ＋台帳にない人）
-  purpose: string;
-  destination: string;
+  operators?: RentalOperator[]; // 実際に運転した人（運転者台帳から選ぶ＋台帳にない人）
   startDate: string;
   endDate: string;
-  pickupPlace: string; // 出発店舗
-  returnPlace: string; // 返却店舗
-  estimateCost: number; // 見積金額
-  cost: number; // 確定金額（返却後）
+  cost: number; // 料金（円）
   startKm: number;
   endKm: number;
-  fuelFull: boolean; // 満タン返却
   damageNote: string; // 傷・事故等の申告
   notes: string;
-  returnedAt?: string;
   createdAt: string;
 };
 

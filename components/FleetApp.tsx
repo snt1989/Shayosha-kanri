@@ -238,7 +238,7 @@ export default function FleetApp() {
   function requireDriverLogin(after?: () => void): boolean {
     if (currentDriver) return true;
     afterDriverLoginRef.current = after ?? null;
-    setDriverLoginNotice('出発登録・帰着登録・車両やレンタカーの予約には、運転者としてのログインが必要です。');
+    setDriverLoginNotice('出発登録・帰着登録・車両の予約・レンタカーの登録には、運転者としてのログインが必要です。');
     setShowDriverLogin(true);
     return false;
   }

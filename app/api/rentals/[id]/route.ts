@@ -16,8 +16,8 @@ export async function DELETE(req: NextRequest, { params }: { params: Promise<{ i
   pushLog(data, {
     actor: isAdminCookieValid(req.cookies.get(ADMIN_COOKIE)?.value) ? 'admin' : 'user',
     action: 'レンタカー削除',
-    target: `${target.startDate} ${target.driver} / ${target.company}`,
-    detail: target.destination,
+    target: `${target.startDate} ${target.company} ${target.carModel || ''}`.trim(),
+    detail: (target.operators || []).map((o) => o.name).join('・') || undefined,
   });
   await saveData({
     reports: data.reports,
