@@ -6,6 +6,7 @@ import {
   DEFAULT_MASTERS,
   DEFAULT_VEHICLES,
   Masters,
+  Reservation,
 } from './types';
 
 const DATA_KEY = 'fleet:data:v1';
@@ -20,6 +21,7 @@ function hasUpstash() {
 function defaultData(): Omit<AppData, 'persistent'> {
   return {
     reports: [],
+    reservations: [],
     // モジュール定数への参照をそのまま返すと、呼び出し側の push 等でこの
     // プロセスの「デフォルトデータ」自体が汚染されてしまうため、必ずコピーを返す。
     vehicles: DEFAULT_VEHICLES.map((v) => ({ ...v, maintHistory: [...v.maintHistory] })),
@@ -68,6 +70,7 @@ async function readLocal(): Promise<Omit<AppData, 'persistent'>> {
     const parsed = JSON.parse(raw);
     return {
       reports: parsed.reports ?? [],
+      reservations: parsed.reservations ?? [],
       vehicles: parsed.vehicles ?? DEFAULT_VEHICLES.map((v) => ({ ...v, maintHistory: [...v.maintHistory] })),
       drivers: parsed.drivers ?? DEFAULT_DRIVERS.map((d) => ({ ...d })),
       masters: mergeMasters(parsed.masters),
@@ -96,6 +99,7 @@ export async function loadData(): Promise<AppData> {
     }
     return {
       reports: raw.reports ?? [],
+      reservations: raw.reservations ?? [],
       vehicles: raw.vehicles ?? DEFAULT_VEHICLES.map((v) => ({ ...v, maintHistory: [...v.maintHistory] })),
       drivers: raw.drivers ?? DEFAULT_DRIVERS.map((d) => ({ ...d })),
       masters: mergeMasters(raw.masters),
@@ -107,7 +111,14 @@ export async function loadData(): Promise<AppData> {
   return { ...local, persistent: false };
 }
 
-export async function saveData(data: Omit<AppData, 'persistent'>): Promise<void> {
+// reservations を渡さない呼び出し（日報・車両などの保存）では、保存済みの予約をそのまま引き継ぐ。
+type SaveInput = Omit<AppData, 'persistent' | 'reservations'> & { reservations?: Reservation[] };
+
+export async function saveData(input: SaveInput): Promise<void> {
+  const data: Omit<AppData, 'persistent'> = {
+    ...input,
+    reservations: input.reservations ?? (await loadData()).reservations,
+  };
   if (hasUpstash()) {
     const redis = await getRedis();
     await redis.set(DATA_KEY, data);

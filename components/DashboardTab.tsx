@@ -1,17 +1,24 @@
 'use client';
 
-import { AppData, MAINT_URGENCIES } from '@/lib/types';
+import { AppData, Driver, MAINT_URGENCIES, Reservation } from '@/lib/types';
 import { openMaintRequests, todayStr } from '@/lib/utils';
 import AlertsPanel from './AlertsPanel';
+import UsageCalendar from './UsageCalendar';
 
 export default function DashboardTab({
   data,
   onReturnCheckin,
   onOpenMaintenance,
+  currentDriver,
+  onSaveReservation,
+  onDeleteReservation,
 }: {
   data: AppData;
   onReturnCheckin: (id: string) => void;
   onOpenMaintenance: () => void;
+  currentDriver?: Driver | null;
+  onSaveReservation: (r: Reservation) => Promise<unknown>;
+  onDeleteReservation: (id: string) => Promise<unknown>;
 }) {
   const today = todayStr();
   const openReports = [...data.reports]
@@ -26,7 +33,7 @@ export default function DashboardTab({
           📊 ダッシュボード
         </h3>
         <div style={{ fontSize: 12, color: 'var(--slate-500)' }}>
-          車検・点検・免許更新・アルコールチェックのアラートと、帰着未登録の日報をまとめて確認できます。
+          車検・点検・免許更新・アルコールチェックのアラート、帰着未登録の日報、整備依頼、車両の使用・予約カレンダーをまとめて確認できます。
         </div>
       </div>
 
@@ -97,6 +104,13 @@ export default function DashboardTab({
           </div>
         )}
       </div>
+
+      <UsageCalendar
+        data={data}
+        currentDriver={currentDriver}
+        onSaveReservation={onSaveReservation}
+        onDeleteReservation={onDeleteReservation}
+      />
 
       <AlertsPanel data={data} standalone />
     </div>

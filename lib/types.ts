@@ -105,8 +105,28 @@ export type LogEntry = {
   detail?: string;
 };
 
+// 車両の予約（使用予定）。日報とは別に、事前に押さえる使用枠を持つ。
+export type Reservation = {
+  id: string;
+  vehicleId: string;
+  vehicleName: string;
+  plate: string;
+  driverId?: string;
+  driver: string;
+  driverLast: string;
+  startDate: string; // YYYY-MM-DD
+  endDate: string; // YYYY-MM-DD（1日だけの予約は startDate と同じ）
+  startTime: string; // HH:MM
+  endTime: string; // HH:MM
+  destination: string;
+  purpose: string;
+  note: string;
+  createdAt: string;
+};
+
 export type AppData = {
   reports: Report[];
+  reservations: Reservation[];
   vehicles: Vehicle[];
   drivers: Driver[];
   masters: Masters;

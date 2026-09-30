@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { AppData, Driver, Masters, Report, Vehicle } from '@/lib/types';
+import { AppData, Driver, Masters, Report, Reservation, Vehicle } from '@/lib/types';
 import Header from './Header';
 import StatBar from './StatBar';
 import DashboardTab from './DashboardTab';
@@ -122,6 +122,25 @@ export default function FleetApp() {
       handleAdminApiError(e);
       throw e;
     }
+  }
+  // 予約は重複などで失敗する（409）のが通常の動作なので、その場合は「同期エラー」表示にしない
+  async function reservationRequest(url: string, init: RequestInit) {
+    setSyncStatus('saving');
+    try {
+      const result = await jsonFetch(url, init);
+      await refreshData();
+      setSyncStatus('idle');
+      return result;
+    } catch (e) {
+      setSyncStatus((e as { status?: number }).status ? 'idle' : 'error');
+      throw e;
+    }
+  }
+  async function saveReservation(r: Reservation) {
+    return reservationRequest('/api/reservations', { method: 'POST', body: JSON.stringify(r) });
+  }
+  async function deleteReservation(id: string) {
+    return reservationRequest(`/api/reservations/${id}`, { method: 'DELETE' });
   }
   async function resolveMaintRequest(id: string, done: boolean) {
     return withSync(() => jsonFetch(`/api/reports/${id}/maint-request`, { method: 'POST', body: JSON.stringify({ done }) }));
@@ -281,7 +300,14 @@ export default function FleetApp() {
 
       <main className="main">
         {tab === 'dashboard' && (
-          <DashboardTab data={data} onReturnCheckin={handleReturnCheckin} onOpenMaintenance={() => setTab('maintenance')} />
+          <DashboardTab
+            data={data}
+            onReturnCheckin={handleReturnCheckin}
+            onOpenMaintenance={() => setTab('maintenance')}
+            currentDriver={currentDriver}
+            onSaveReservation={saveReservation}
+            onDeleteReservation={deleteReservation}
+          />
         )}
         {tab === 'reports' && (
           <ReportsTab
