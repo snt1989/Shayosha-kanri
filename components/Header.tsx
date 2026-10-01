@@ -6,8 +6,8 @@ type SyncStatus = 'idle' | 'saving' | 'error';
 const TABS: { key: Tab; label: string; icon: string; admin?: boolean }[] = [
   { key: 'dashboard', label: 'ダッシュボード', icon: '📊' },
   { key: 'reports', label: '運転日報', icon: '📝' },
-  { key: 'maintenance', label: '整備台帳', icon: '🔧' },
   { key: 'fuel', label: '給油台帳', icon: '⛽' },
+  { key: 'maintenance', label: '整備台帳', icon: '🔧' },
   { key: 'rental', label: 'レンタカー', icon: '🚗' },
   { key: 'admin', label: '管理画面', icon: '🛠️', admin: true },
 ];
